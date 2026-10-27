@@ -18,11 +18,14 @@ def capture_faces():
     os.makedirs(person_path, exist_ok=True)
 
     face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades +
         "haarcascade_frontalface_default.xml"
     )
 
-    cap = cv2.VideoCapture(0)
+    if face_cascade.empty():
+        print("Error: Face detection file could not be loaded.")
+        return
+
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     count = 0
 
     if not cap.isOpened():
@@ -140,9 +143,12 @@ def recognize_faces():
     print("Press ESC to exit.\n")
 
     face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades +
         "haarcascade_frontalface_default.xml"
-    )
+)
+
+    if face_cascade.empty():
+        print("Error: Face detection file could not be loaded.")
+        return
 
     cap = cv2.VideoCapture(0)
 
