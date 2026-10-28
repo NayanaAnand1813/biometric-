@@ -39,8 +39,15 @@
             color: #e5652b;
             text-align: center;
             letter-spacing: 0.5px;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
             display: block;
+        }
+        .step-transition {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
   </head>
@@ -77,47 +84,91 @@
       </section>
 
       <section class="login-card" aria-labelledby="login-heading">
-        <div class="card-top"><span>🛡</span> SECURE ACCESS</div>
+        <div class="card-top">
+          <span>🛡</span>
+          <span id="step-badge">STEP 1 OF 2 · CREDENTIALS</span>
+        </div>
         <p class="eyebrow">OJIX PROPERTY INTELLIGENCE</p>
         <h2 id="login-heading">Welcome back</h2>
-        <p class="subtitle">Choose your assigned role, then sign in to continue.</p>
+        <p class="subtitle" id="login-subtitle">Choose your assigned role, enter your details, then verify identity.</p>
 
-        <form id="login-form" onsubmit="return false;">
-          <label>
-            <span>Assigned role</span>
-            <select id="role" required>
-              <option value="">Select your assigned role</option>
-              <option>Super Admin</option><option>Owner</option><option>Admin</option>
-              <option>Lawyer</option><option>Analyst</option><option>Operations</option>
-              <option>Consultant</option><option>Support</option><option>Data Steward</option><option>Viewer</option>
-            </select>
-          </label>
-          <label>
-            <span>Work email</span>
-            <input id="email" type="email" placeholder="name@organisation.com" autocomplete="username" required />
-          </label>
-          <label>
-            <span>Password</span>
-            <div class="password-field">
-              <input id="password" type="password" autocomplete="current-password" required />
-              <button id="toggle-password" type="button" aria-label="Show password">Show</button>
+        <!-- STEP 1: FORM CREDENTIALS -->
+        <div id="step1-container" class="step-transition">
+          <form id="credentials-form" onsubmit="return false;">
+            <label>
+              <span>Assigned role</span>
+              <select id="role" required>
+                <option value="">Select your assigned role</option>
+                <option>Super Admin</option><option>Owner</option><option>Admin</option>
+                <option>Lawyer</option><option>Analyst</option><option>Operations</option>
+                <option>Consultant</option><option>Support</option><option>Data Steward</option><option>Viewer</option>
+              </select>
+            </label>
+            <label>
+              <span>Work email</span>
+              <input id="email" type="email" placeholder="name@organisation.com" autocomplete="username" required />
+            </label>
+            <label>
+              <span>Password</span>
+              <div class="password-field">
+                <input id="password" type="password" autocomplete="current-password" required />
+                <button id="toggle-password" type="button" aria-label="Show password">Show</button>
+              </div>
+            </label>
+            <label>
+              <span>Send verification code by</span>
+              <select id="delivery"><option>Email</option><option>Authenticator app</option></select>
+            </label>
+
+            <div class="form-meta">
+              <span>Verification codes expire after 10 minutes.</span>
+              <a href="#">Forgot password?</a>
             </div>
-          </label>
-          <label>
-            <span>Send verification code by</span>
-            <select id="delivery"><option>Email</option><option>Authenticator app</option></select>
-          </label>
-          
-          <label><span>Biometric Identity Scanner Verification</span></label>
-          <div class="biometric-scanner-box">
-              <img src="/video_feed" alt="OJIX Live Scanner Feed">
-          </div>
-          <span class="biometric-status" id="scannerStatus">AWAITING SYSTEM FACE RECOGNITION MATCH...</span>
 
-          <div class="form-meta"><span>Verification codes expire after 10 minutes.</span><a href="#">Forgot password?</a></div>
-          <button class="submit" type="submit" id="submitBtn" disabled style="opacity: 0.5; cursor: not-allowed; background: #94a3b8; box-shadow: none;">Awaiting Biometric ID Match... →</button>
-          <p id="message" class="message" role="status" aria-live="polite"></p>
-        </form>
+            <p id="form-error" style="color: #dc2626; font-size: 11px; margin: 6px 0 0; display: none; font-weight: 700; text-align: center;"></p>
+
+            <button class="submit" type="button" id="proceedBtn" style="margin-top: 12px;">
+              Proceed to Biometric Verification →
+            </button>
+          </form>
+        </div>
+
+        <!-- STEP 2: BIOMETRIC SCANNER & REGISTRATION -->
+        <div id="step2-container" class="step-transition" style="display: none;">
+          <!-- User Details Summary Pill -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div id="summary-email" style="font-size: 12px; font-weight: 800; color: #1d4278;">name@organisation.com</div>
+              <div id="summary-role" style="font-size: 11px; color: #64748b; font-weight: 600;">Super Admin</div>
+            </div>
+            <button type="button" id="backToStep1Btn" style="background: none; border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 700; color: #475569; cursor: pointer;">
+              Edit ✎
+            </button>
+          </div>
+
+          <label style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Biometric Identity Scanner</span>
+            <span style="font-size: 10px; color: #16a34a; font-weight: 800;">● CAMERA ACTIVE</span>
+          </label>
+
+          <div class="biometric-scanner-box">
+            <img id="videoFeedImg" src="" alt="OJIX Live Scanner Feed">
+          </div>
+          <span class="biometric-status" id="scannerStatus">ALIGN FACE WITHIN VIEWFINDER FOR BIOMETRIC SCAN...</span>
+
+          <!-- Register Face Prompt (shown when unregistered face is rejected) -->
+          <div id="register-box" style="display: none; background: #eff6ff; border: 1px dashed #3b82f6; border-radius: 8px; padding: 12px; margin: 10px 0; text-align: center;">
+            <p style="margin: 0 0 8px; font-size: 11px; font-weight: 700; color: #1e40af;">Unregistered Face? Enroll Biometrics Now</p>
+            <p style="margin: 0 0 10px; font-size: 10px; color: #64748b;">Click below to capture your face and register it to this account.</p>
+            <button type="button" id="registerFaceBtn" style="width: 100%; padding: 10px; border-radius: 6px; border: 0; background: #2563eb; color: #fff; font-weight: 800; font-size: 11px; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,.25);">
+              📷 Register This Face to Account
+            </button>
+          </div>
+
+          <button class="submit" type="button" id="submitBtn" disabled style="opacity: 0.5; cursor: not-allowed; background: #94a3b8; box-shadow: none; margin-top: 10px;">
+            Awaiting Biometric ID Match... →
+          </button>
+        </div>
 
         <p class="legal">Authentication and OTP verification is reinforced by secure server face matching structures.</p>
       </section>
@@ -126,6 +177,7 @@
     <footer><span>OJIX Property Intelligence</span><span>Demonstration interface · No production credentials included</span></footer>
 
     <script>
+        // Password visibility toggle
         document.getElementById('toggle-password').addEventListener('click', function() {
             const pwdField = document.getElementById('password');
             if (pwdField.type === 'password') {
@@ -137,60 +189,175 @@
             }
         });
 
-        const liveVerificationLoop = setInterval(() => {
-            fetch('/check_auth_status')
-                .then(res => res.json())
-                .then(data => {
-                    const labelBox = document.getElementById('scannerStatus');
-                    const actionBtn = document.getElementById('submitBtn');
+        const step1Container = document.getElementById('step1-container');
+        const step2Container = document.getElementById('step2-container');
+        const stepBadge = document.getElementById('step-badge');
+        const loginSubtitle = document.getElementById('login-subtitle');
+        const formError = document.getElementById('form-error');
+        const videoFeedImg = document.getElementById('videoFeedImg');
+        const registerBox = document.getElementById('register-box');
+        const registerFaceBtn = document.getElementById('registerFaceBtn');
 
-                    if (data.status === "success") {
-                        clearInterval(liveVerificationLoop);
-                        
-                        labelBox.style.color = "#16a34a";
-                        labelBox.innerText = `BIOMETRIC ACCESS VERIFIED: WELCOME ${data.username.toUpperCase()}`;
-                        
-                        actionBtn.disabled = false;
-                        actionBtn.style.opacity = "1";
-                        actionBtn.style.cursor = "pointer";
-                        actionBtn.style.background = "var(--orange)";
-                        actionBtn.style.boxShadow = "0 7px 16px rgba(229,101,43,.2)";
-                        actionBtn.innerText = "Continue securely →";
-                        
-                        setTimeout(() => {
-                            window.location.href = data.redirect;
-                        }, 1200);
-                    } else if (data.status === "denied") {
-                        labelBox.style.color = "#dc2626";
-                        labelBox.innerText = `ACCESS DENIED: UNREGISTERED USER (DIST: ${data.distance} > THRESHOLD: ${data.threshold})`;
-                        actionBtn.disabled = true;
-                        actionBtn.style.opacity = "0.5";
-                        actionBtn.style.cursor = "not-allowed";
-                        actionBtn.style.background = "#ef4444";
-                        actionBtn.style.boxShadow = "none";
-                        actionBtn.innerText = "Access Denied ✕";
-                    } else if (data.status === "identifying") {
-                        labelBox.style.color = "#2563eb";
-                        labelBox.innerText = `MATCHING ID: ${data.username.toUpperCase()} (${data.progress}% VERIFIED)...`;
-                        actionBtn.disabled = true;
-                        actionBtn.style.opacity = "0.5";
-                        actionBtn.style.cursor = "not-allowed";
-                        actionBtn.style.background = "#94a3b8";
-                        actionBtn.style.boxShadow = "none";
-                        actionBtn.innerText = `Verifying Identity (${data.progress}%)...`;
-                    } else {
-                        labelBox.style.color = "#e5652b";
-                        labelBox.innerText = "AWAITING SYSTEM FACE RECOGNITION MATCH...";
-                        actionBtn.disabled = true;
-                        actionBtn.style.opacity = "0.5";
-                        actionBtn.style.cursor = "not-allowed";
-                        actionBtn.style.background = "#94a3b8";
-                        actionBtn.style.boxShadow = "none";
-                        actionBtn.innerText = "Awaiting Biometric ID Match... →";
-                    }
-                })
-                .catch(err => console.error("API backend sync fault: ", err));
-        }, 500);
+        let liveVerificationLoop = null;
+
+        // STEP 1 -> STEP 2 TRANSITION
+        document.getElementById('proceedBtn').addEventListener('click', function() {
+            const role = document.getElementById('role').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            if (!role || !email || !password) {
+                formError.style.display = "block";
+                formError.innerText = "Please select an assigned role, work email, and password to continue.";
+                return;
+            }
+
+            formError.style.display = "none";
+
+            // Send credentials to backend session
+            fetch('/set_credentials', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role: role, email: email })
+            }).then(() => {
+                // Update Step 2 Summary info
+                document.getElementById('summary-email').innerText = email;
+                document.getElementById('summary-role').innerText = role;
+
+                // Switch UI Steps
+                step1Container.style.display = "none";
+                step2Container.style.display = "block";
+                stepBadge.innerText = "STEP 2 OF 2 · BIOMETRIC VERIFICATION";
+                loginSubtitle.innerText = "Look into the camera to authenticate or register your face.";
+
+                // Activate camera stream only now
+                videoFeedImg.src = "/video_feed";
+                startBiometricPolling();
+            }).catch(err => {
+                console.error("Session init fault:", err);
+            });
+        });
+
+        // STEP 2 -> STEP 1 BACK BUTTON
+        document.getElementById('backToStep1Btn').addEventListener('click', function() {
+            stopBiometricPolling();
+            videoFeedImg.src = "";
+            step2Container.style.display = "none";
+            step1Container.style.display = "block";
+            stepBadge.innerText = "STEP 1 OF 2 · CREDENTIALS";
+            loginSubtitle.innerText = "Choose your assigned role, enter your details, then verify identity.";
+            registerBox.style.display = "none";
+        });
+
+        function stopBiometricPolling() {
+            if (liveVerificationLoop) {
+                clearInterval(liveVerificationLoop);
+                liveVerificationLoop = null;
+            }
+        }
+
+        function startBiometricPolling() {
+            stopBiometricPolling();
+            const labelBox = document.getElementById('scannerStatus');
+            const actionBtn = document.getElementById('submitBtn');
+
+            liveVerificationLoop = setInterval(() => {
+                fetch('/check_auth_status')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === "success") {
+                            stopBiometricPolling();
+                            registerBox.style.display = "none";
+                            
+                            labelBox.style.color = "#16a34a";
+                            labelBox.innerText = `BIOMETRIC ACCESS VERIFIED: WELCOME ${data.username.toUpperCase()}`;
+                            
+                            actionBtn.disabled = false;
+                            actionBtn.style.opacity = "1";
+                            actionBtn.style.cursor = "pointer";
+                            actionBtn.style.background = "var(--orange)";
+                            actionBtn.style.boxShadow = "0 7px 16px rgba(229,101,43,.2)";
+                            actionBtn.innerText = "Enter Workspace Portal →";
+                            
+                            setTimeout(() => {
+                                window.location.href = data.redirect;
+                            }, 1200);
+                        } else if (data.status === "denied") {
+                            labelBox.style.color = "#dc2626";
+                            labelBox.innerText = `ACCESS DENIED: UNREGISTERED FACE (DIST: ${data.distance} > ${data.threshold})`;
+                            registerBox.style.display = "block"; // Show registration option
+                            
+                            actionBtn.disabled = true;
+                            actionBtn.style.opacity = "0.5";
+                            actionBtn.style.cursor = "not-allowed";
+                            actionBtn.style.background = "#ef4444";
+                            actionBtn.style.boxShadow = "none";
+                            actionBtn.innerText = "Access Denied ✕";
+                        } else if (data.status === "identifying") {
+                            labelBox.style.color = "#2563eb";
+                            labelBox.innerText = `MATCHING ID: ${data.username.toUpperCase()} (${data.progress}% VERIFIED)...`;
+                            registerBox.style.display = "none";
+                            
+                            actionBtn.disabled = true;
+                            actionBtn.style.opacity = "0.5";
+                            actionBtn.style.cursor = "not-allowed";
+                            actionBtn.style.background = "#94a3b8";
+                            actionBtn.style.boxShadow = "none";
+                            actionBtn.innerText = `Verifying Identity (${data.progress}%)...`;
+                        } else {
+                            labelBox.style.color = "#e5652b";
+                            labelBox.innerText = "ALIGN FACE IN VIEWFINDER FOR BIOMETRIC SCAN...";
+                            actionBtn.disabled = true;
+                            actionBtn.style.opacity = "0.5";
+                            actionBtn.style.cursor = "not-allowed";
+                            actionBtn.style.background = "#94a3b8";
+                            actionBtn.style.boxShadow = "none";
+                            actionBtn.innerText = "Awaiting Biometric ID Match... →";
+                        }
+                    })
+                    .catch(err => console.error("Biometric API sync fault:", err));
+            }, 500);
+        }
+
+        // REGISTER FACE ACTION
+        registerFaceBtn.addEventListener('click', function() {
+            const email = document.getElementById('email').value.trim();
+            registerFaceBtn.disabled = true;
+            registerFaceBtn.innerText = "Capturing facial patterns... Hold still...";
+            registerFaceBtn.style.background = "#94a3b8";
+
+            fetch('/register_face', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === "success") {
+                    registerFaceBtn.innerText = "Face Registered Successfully! ✔";
+                    registerFaceBtn.style.background = "#16a34a";
+                    
+                    const labelBox = document.getElementById('scannerStatus');
+                    labelBox.style.color = "#16a34a";
+                    labelBox.innerText = `ENROLLED & VERIFIED: WELCOME ${data.username.toUpperCase()}`;
+                    
+                    setTimeout(() => {
+                        window.location.href = data.redirect;
+                    }, 1200);
+                } else {
+                    alert(data.message || "Failed to register face. Please try again.");
+                    registerFaceBtn.disabled = false;
+                    registerFaceBtn.innerText = "📷 Register This Face to Account";
+                    registerFaceBtn.style.background = "#2563eb";
+                }
+            })
+            .catch(err => {
+                console.error("Registration fault:", err);
+                registerFaceBtn.disabled = false;
+                registerFaceBtn.innerText = "📷 Register This Face to Account";
+                registerFaceBtn.style.background = "#2563eb";
+            });
+        });
     </script>
   </body>
 </html>
