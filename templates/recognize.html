@@ -1,24 +1,34 @@
 {% extends "base.html" %}
 
-{% block title %}Live Recognition & Login - Face Recognition System{% endblock %}
+{% block title %}Live Recognition & Diagnostics - FaceBio{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
-    <h1 class="page-title">Live Face Recognition & Login</h1>
-    <p class="page-desc">Real-time biometric facial recognition and authentication using OpenCV LBPH.</p>
+    <h1 class="page-title">Live Biometric Recognition</h1>
+    <p class="page-desc">Real-time facial vectoring, distance scoring, and sensitivity calibration.</p>
   </div>
   <div style="display: flex; gap: 10px;">
-    <a href="{{ url_for('index') }}" class="btn btn-secondary">Home Portal</a>
-    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Dashboard</a>
+    <a href="{{ url_for('landing_page') }}" class="btn btn-secondary btn-sm">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      <span>Portal Home</span>
+    </a>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+      <span>Dashboard</span>
+    </a>
   </div>
 </div>
 
 <!-- Alert if Model is not trained -->
 <div id="unloadedModelAlert" class="alert alert-danger" style="display: none;">
-  <span>❌</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="15" y1="9" x2="9" y2="15"/>
+    <line x1="9" y1="9" x2="15" y2="15"/>
+  </svg>
   <div>
-    <strong>Recognition Model Not Ready:</strong> Please train the model with registered face samples before running recognition.
+    <strong>Recognition Model Not Ready:</strong> Please train the classifier with registered samples before launching recognition.
     <a href="{{ url_for('train') }}" style="color: #f87171; text-decoration: underline; margin-left: 8px;">Train Model Now</a>
   </div>
 </div>
@@ -26,28 +36,40 @@
 <div class="grid-2">
   <!-- Left Column: Camera Viewport with Overlay -->
   <div class="card" style="display: flex; flex-direction: column; align-items: center;">
-    <div class="camera-stage">
+    <div class="camera-stage" id="cameraStageDiagnostic" style="max-width: 600px;">
+      <div class="camera-hud-tr"></div>
+      <div class="camera-hud-bl"></div>
+      <div class="camera-scan-line"></div>
+
       <div id="cameraPlaceholder" class="camera-placeholder">
-        <div class="camera-placeholder-icon">🎯</div>
-        <p>Recognition camera is currently off.</p>
-        <p style="font-size: 0.8rem;">Click <strong>Start Recognition</strong> to activate webcam.</p>
+        <div class="camera-placeholder-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+            <circle cx="12" cy="12" r="3.5"/>
+          </svg>
+        </div>
+        <p style="font-weight: 600; color: #ffffff;">Camera Sensor Offline</p>
+        <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">Click <strong>Start Recognition</strong> to activate the live feed.</p>
       </div>
+
       <video id="webcamVideo" class="camera-video" autoplay playsinline muted style="display: none;"></video>
       <canvas id="overlayCanvas" class="overlay-canvas"></canvas>
       <canvas id="captureCanvas" style="display: none;"></canvas>
     </div>
 
     <!-- Recognition Feedback Card -->
-    <div id="loginFeedbackCard" class="card" style="width: 100%; max-width: 640px; padding: 18px; margin-top: 10px; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: space-between;">
+    <div id="loginFeedbackCard" class="card" style="width: 100%; max-width: 600px; padding: 18px 22px; margin-top: 14px; background: rgba(11, 18, 33, 0.7); display: flex; align-items: center; justify-content: space-between;">
       <div style="display: flex; align-items: center; gap: 14px;">
-        <div id="matchStatusIcon" style="font-size: 32px;">👤</div>
+        <div id="matchStatusIcon" style="width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: center; color: var(--text-muted);">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
         <div>
-          <div id="matchName" style="font-size: 1.25rem; font-weight: 700;">Camera Inactive</div>
-          <div id="matchSubtext" style="font-size: 0.85rem; color: var(--text-muted);">Start the camera to begin identity verification</div>
+          <div id="matchName" style="font-size: 1.15rem; font-weight: 700; color: #ffffff;">Sensor Inactive</div>
+          <div id="matchSubtext" style="font-size: 0.82rem; color: var(--text-muted);">Activate camera to run recognition</div>
         </div>
       </div>
       <div id="matchBadgeContainer">
-        <span class="badge badge-info">Idle</span>
+        <span class="badge badge-info">Standby</span>
       </div>
     </div>
   </div>
@@ -57,41 +79,45 @@
     <!-- Controls Card -->
     <div class="card">
       <div class="card-header">
-        <h2 class="card-title">Recognition Controls</h2>
+        <h2 class="card-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Sensor Calibration</span>
+        </h2>
       </div>
 
       <div style="display: flex; gap: 12px; margin-bottom: 24px;">
-        <button id="startRecBtn" class="btn btn-success" style="flex: 1; padding: 14px; font-size: 1rem;">
-          <span>▶️</span> Start Recognition
+        <button id="startRecBtn" class="btn btn-success" style="flex: 1; padding: 13px;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span>Start Camera</span>
         </button>
-        <button id="stopRecBtn" class="btn btn-secondary" style="flex: 1; padding: 14px; font-size: 1rem;" disabled>
-          <span>⏹️</span> Stop Camera
+        <button id="stopRecBtn" class="btn btn-secondary" style="flex: 1; padding: 13px;" disabled>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12"/></svg>
+          <span>Stop Camera</span>
         </button>
       </div>
 
-      <!-- Threshold Calibration Slider -->
-      <div class="form-group" style="background: rgba(0, 0, 0, 0.2); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <label for="thresholdSlider" class="form-label" style="margin: 0;">LBPH Distance Threshold:</label>
+      <!-- Threshold Slider -->
+      <div class="form-group" style="background: rgba(11, 18, 33, 0.7); padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border-card);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <label for="thresholdSlider" class="form-label" style="margin: 0;">LBPH Distance Ceiling:</label>
           <span id="thresholdValueText" class="badge badge-info" style="font-size: 0.95rem;">80.0</span>
         </div>
         <input 
           type="range" 
           id="thresholdSlider" 
+          class="form-range"
           min="40" 
           max="120" 
           step="5" 
           value="80" 
-          style="width: 100%; cursor: pointer;"
         >
-        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
-          <span>Stricter Match (40)</span>
-          <span>Default (80)</span>
-          <span>More Tolerant (120)</span>
+        <div style="display: flex; justify-content: space-between; font-size: 0.76rem; color: var(--text-dim); margin-top: 6px; font-family: var(--font-mono);">
+          <span>Strict (40)</span>
+          <span>Balanced (80)</span>
+          <span>Tolerant (120)</span>
         </div>
-        <p class="form-help" style="margin-top: 10px; line-height: 1.5;">
-          <strong>Understanding LBPH Confidence:</strong> In OpenCV LBPH, confidence represents spatial histogram distance. 
-          A <em>lower</em> number indicates a closer biometric match (0 is identical). If confidence is below the threshold, the identity is accepted.
+        <p style="margin-top: 12px; font-size: 0.8rem; color: var(--text-muted); line-height: 1.5;">
+          Lower values require higher facial similarity (0 is a mathematical duplicate). If measured histogram distance is below this value, match is confirmed.
         </p>
       </div>
     </div>
@@ -99,24 +125,27 @@
     <!-- Live Diagnostics Card -->
     <div class="card">
       <div class="card-header">
-        <h2 class="card-title">Live Diagnostics</h2>
+        <h2 class="card-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span>Telemetry & Inference</span>
+        </h2>
       </div>
       <ul style="list-style: none; display: flex; flex-direction: column; gap: 12px; font-size: 0.9rem;">
-        <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-          <span style="color: var(--text-muted);">Inference Rate:</span>
-          <strong id="fpsCounter">~5 fps (200ms)</strong>
+        <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+          <span style="color: var(--text-muted);">Frame Sampling Rate:</span>
+          <strong id="fpsCounter" style="color: #38bdf8; font-family: var(--font-mono);">~5 fps (200ms)</strong>
         </li>
-        <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
           <span style="color: var(--text-muted);">Detected Faces:</span>
-          <strong id="diagFaceCount">0</strong>
+          <strong id="diagFaceCount" style="font-family: var(--font-mono);">0</strong>
         </li>
-        <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-          <span style="color: var(--text-muted);">Last Distance Score:</span>
-          <strong id="diagScore">--</strong>
+        <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;">
+          <span style="color: var(--text-muted);">Latest Distance Metric:</span>
+          <strong id="diagScore" style="color: #34d399; font-family: var(--font-mono);">--</strong>
         </li>
         <li style="display: flex; justify-content: space-between;">
-          <span style="color: var(--text-muted);">Registered Users in Memory:</span>
-          <strong id="diagRegisteredCount">--</strong>
+          <span style="color: var(--text-muted);">Memory User Count:</span>
+          <strong id="diagRegisteredCount" style="font-family: var(--font-mono);">--</strong>
         </li>
       </ul>
     </div>
@@ -127,4 +156,3 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/recognize.js') }}"></script>
 {% endblock %}
-

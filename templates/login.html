@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Face Login - Biometric Verification</title>
+  <title>Biometric Face Login - FaceBio</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔓</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2310b981%22 stroke-width=%222%22><rect x=%223%22 y=%2211%22 width=%2218%22 height=%2211%22 rx=%222%22 ry=%222%22/><path d=%22M7 11V7a5 5 0 0 1 10 0v4%22/></svg>">
   <style>
     body {
       display: flex;
@@ -13,57 +13,135 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      background: linear-gradient(135deg, #0b1120 0%, #0f172a 100%);
       margin: 0;
-      padding: 20px;
+      padding: 24px 20px;
     }
     .login-container {
       width: 100%;
-      max-width: 660px;
-      background-color: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      padding: 32px 28px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      max-width: 680px;
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-xl);
+      padding: 36px 32px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7);
       text-align: center;
+      position: relative;
+    }
+    .login-top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .live-status-card {
+      margin-top: 18px;
+      padding: 16px 20px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      font-weight: 600;
+      font-size: 0.98rem;
+      border: 1px solid var(--border-card);
+      background: rgba(15, 23, 42, 0.8);
+      transition: all var(--transition-normal);
+    }
+    .live-status-card.scanning {
+      border-color: rgba(56, 189, 248, 0.35);
+      color: #38bdf8;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+    }
+    .live-status-card.success {
+      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(16, 185, 129, 0.1);
+      color: #34d399;
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.25);
+    }
+    .live-status-card.warning {
+      border-color: rgba(245, 158, 11, 0.4);
+      background: rgba(245, 158, 11, 0.1);
+      color: #fbbf24;
+    }
+    .status-spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
   </style>
 </head>
 <body>
 
   <div class="login-container">
-    <!-- Header -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-      <a href="{{ url_for('landing_page') }}" class="btn btn-secondary" style="font-size: 0.85rem; padding: 8px 14px;">
-        ← Back to Home
+    <!-- Top Header Bar -->
+    <div class="login-top-bar">
+      <a href="{{ url_for('landing_page') }}" class="btn btn-secondary btn-sm">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="19" y1="12" x2="5" y2="12"/>
+          <polyline points="12 19 5 12 12 5"/>
+        </svg>
+        <span>Portal Home</span>
       </a>
-      <h2 style="font-size: 1.35rem; font-weight: 700; margin: 0;">Biometric Face Login</h2>
-      <span class="badge badge-success">Live Camera</span>
+      
+      <div>
+        <h2 style="font-size: 1.28rem; font-weight: 700; margin: 0;">Biometric Verification</h2>
+        <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">LBPH Real-Time Face Authentication</p>
+      </div>
+
+      <span class="badge badge-success">
+        <span class="pulse-dot" style="width: 6px; height: 6px;" aria-hidden="true"></span>
+        <span>Sensor Active</span>
+      </span>
     </div>
 
-    <!-- Camera Stage -->
-    <div class="camera-stage" style="max-width: 600px; margin: 0 auto 18px auto;">
+    <!-- Futuristic Cyber Camera HUD Stage -->
+    <div id="cameraStage" class="camera-stage active" style="margin: 0 auto;">
+      <div class="camera-hud-tr"></div>
+      <div class="camera-hud-bl"></div>
+      <div class="camera-scan-line"></div>
+
       <div id="camPlaceholder" class="camera-placeholder">
-        <div class="camera-placeholder-icon">📷</div>
-        <p style="font-weight: 600;">Starting Recognition Camera...</p>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
-          Please allow camera access in your browser.
+        <div class="camera-placeholder-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </div>
+        <p style="font-weight: 600; color: #ffffff;">Initializing Optical Biometric Sensor...</p>
+        <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
+          Please grant camera permission in your browser prompt.
         </p>
       </div>
+
       <video id="webcam" class="camera-video" autoplay playsinline muted style="display: none;"></video>
       <canvas id="overlay" class="overlay-canvas"></canvas>
       <canvas id="hiddenCanvas" style="display: none;"></canvas>
     </div>
 
-    <!-- Live Status Banner -->
-    <div id="statusBanner" class="alert alert-info" style="justify-content: center; font-weight: 600; font-size: 1.05rem;">
-      <span id="statusIcon">🔍</span>
-      <span id="statusMessage">Scanning for face... Look directly at the camera.</span>
+    <!-- Real-time HUD Status Indicator -->
+    <div id="statusBanner" class="live-status-card scanning">
+      <div id="statusSpinner" class="status-spinner"></div>
+      <span id="statusMessage">Scanning for face... Please look directly into the camera.</span>
     </div>
 
-    <!-- Attempt countdown indicator for unknown faces -->
-    <div id="unknownWarning" style="display: none; font-size: 0.85rem; color: #f87171; margin-top: 10px;">
-      ⚠️ Unrecognized face detected. Redirecting to registration in <strong id="countdownText">3</strong>...
+    <!-- Countdown Warning for Unregistered Identity -->
+    <div id="unknownWarning" class="alert alert-warning" style="display: none; margin-top: 16px; margin-bottom: 0; justify-content: center; font-size: 0.88rem;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <span>Face not recognized. Redirecting to registration in <strong id="countdownText">3</strong> seconds...</span>
     </div>
   </div>
 
@@ -73,8 +151,9 @@
     const overlay = document.getElementById('overlay');
     const hiddenCanvas = document.getElementById('hiddenCanvas');
     const camPlaceholder = document.getElementById('camPlaceholder');
+    const cameraStage = document.getElementById('cameraStage');
     const statusBanner = document.getElementById('statusBanner');
-    const statusIcon = document.getElementById('statusIcon');
+    const statusSpinner = document.getElementById('statusSpinner');
     const statusMessage = document.getElementById('statusMessage');
     const unknownWarning = document.getElementById('unknownWarning');
     const countdownText = document.getElementById('countdownText');
@@ -87,172 +166,196 @@
     let isRunning = true;
     let recognizedUser = null;
     let unrecognizedConsecutiveCount = 0;
-    const UNRECOGNIZED_LIMIT = 5; // After 5 unrecognized frames in a row, redirect
+    const UNRECOGNIZED_LIMIT = 5;
 
-    function setStatus(msg, type = 'info', icon = '🔍') {
-      statusBanner.className = `alert alert-${type}`;
-      statusIcon.textContent = icon;
+    function setStatus(msg, state = 'scanning') {
+      statusBanner.className = `live-status-card ${state}`;
       statusMessage.textContent = msg;
+      if (state === 'scanning') {
+        statusSpinner.style.display = 'block';
+      } else {
+        statusSpinner.style.display = 'none';
+      }
     }
 
     function clearOverlay() {
       overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
     }
 
+    function drawFaceBox(x, y, w, h, label, isVerified, score) {
+      clearOverlay();
+      const color = isVerified ? '#10b981' : '#f59e0b';
+      overlayCtx.strokeStyle = color;
+      overlayCtx.lineWidth = 2.5;
+
+      const cornerLen = Math.min(w, h) * 0.25;
+
+      // Draw futuristic corner brackets
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(x, y + cornerLen);
+      overlayCtx.lineTo(x, y);
+      overlayCtx.lineTo(x + cornerLen, y);
+
+      overlayCtx.moveTo(x + w - cornerLen, y);
+      overlayCtx.lineTo(x + w, y);
+      overlayCtx.lineTo(x + w, y + cornerLen);
+
+      overlayCtx.moveTo(x + w, y + h - cornerLen);
+      overlayCtx.lineTo(x + w, y + h);
+      overlayCtx.lineTo(x + w - cornerLen, y + h);
+
+      overlayCtx.moveTo(x + cornerLen, y + h);
+      overlayCtx.lineTo(x, y + h);
+      overlayCtx.lineTo(x, y + h - cornerLen);
+      overlayCtx.stroke();
+
+      // Label badge
+      const tagText = isVerified ? `VERIFIED: ${label.toUpperCase()} (${score.toFixed(0)}%)` : 'SCANNING IDENTITY...';
+      overlayCtx.font = '600 12px "Plus Jakarta Sans", sans-serif';
+      const textMetrics = overlayCtx.measureText(tagText);
+      const tagWidth = textMetrics.width + 16;
+      const tagHeight = 24;
+
+      overlayCtx.fillStyle = color;
+      overlayCtx.fillRect(x, Math.max(0, y - tagHeight - 4), tagWidth, tagHeight);
+
+      overlayCtx.fillStyle = '#ffffff';
+      overlayCtx.fillText(tagText, x + 8, Math.max(16, y - 10));
+    }
+
     async function startCamera() {
       try {
         mediaStream = await navigator.mediaDevices.getUserMedia({
           video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-          audio: false,
+          audio: false
         });
-
         webcam.srcObject = mediaStream;
-        webcam.style.display = 'block';
-        camPlaceholder.style.display = 'none';
 
         webcam.onloadedmetadata = () => {
-          overlay.width = webcam.videoWidth || 640;
-          overlay.height = webcam.videoHeight || 480;
-          hiddenCanvas.width = webcam.videoWidth || 640;
-          hiddenCanvas.height = webcam.videoHeight || 480;
-        };
+          overlay.width = webcam.videoWidth;
+          overlay.height = webcam.videoHeight;
+          hiddenCanvas.width = webcam.videoWidth;
+          hiddenCanvas.height = webcam.videoHeight;
 
-        setStatus('Camera active. Scanning face...', 'info', '🔍');
-        recognitionLoop();
+          camPlaceholder.style.display = 'none';
+          webcam.style.display = 'block';
+          cameraStage.classList.add('active');
+
+          setStatus('Sensor ready. Align your face within the viewfinder.', 'scanning');
+          runRecognitionLoop();
+        };
       } catch (err) {
-        console.error('Camera error:', err);
-        setStatus('Could not access camera. Please allow camera permissions.', 'danger', '❌');
+        console.error('Camera initialization error:', err);
+        camPlaceholder.innerHTML = `
+          <div class="camera-placeholder-icon" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          </div>
+          <p style="color: #f87171; font-weight: 700;">Camera Access Denied or Unavailable</p>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; max-width: 380px;">
+            Please ensure a camera is attached and enable browser camera permissions to authenticate.
+          </p>
+          <a href="/" class="btn btn-secondary btn-sm" style="margin-top: 16px;">Return to Portal</a>
+        `;
+        setStatus('Camera access blocked. Please enable permissions.', 'warning');
       }
     }
 
-    function renderFaceBoxes(faces) {
-      clearOverlay();
-      if (!faces || faces.length === 0) return;
+    async function runRecognitionLoop() {
+      if (!isRunning) return;
 
-      const scaleX = overlay.width / (hiddenCanvas.width || 640);
-      const scaleY = overlay.height / (hiddenCanvas.height || 480);
-
-      faces.forEach((face) => {
-        const [x, y, w, h] = face.box;
-        const rx = x * scaleX;
-        const ry = y * scaleY;
-        const rw = w * scaleX;
-        const rh = h * scaleY;
-
-        const isMatch = face.matched;
-        const color = isMatch ? '#10b981' : '#ef4444';
-        const label = isMatch ? `${face.name} (${face.accuracy_pct}%)` : `Unknown (${face.confidence})`;
-
-        overlayCtx.lineWidth = 3;
-        overlayCtx.strokeStyle = color;
-        overlayCtx.strokeRect(rx, ry, rw, rh);
-
-        overlayCtx.font = 'bold 15px sans-serif';
-        const textWidth = overlayCtx.measureText(label).width;
-        const tagY = ry > 30 ? ry - 28 : ry + rh + 4;
-
-        overlayCtx.fillStyle = color;
-        overlayCtx.fillRect(rx, tagY, textWidth + 14, 24);
-
-        overlayCtx.fillStyle = '#ffffff';
-        overlayCtx.fillText(label, rx + 7, tagY + 17);
-      });
-    }
-
-    async function recognitionLoop() {
-      if (!isRunning || !mediaStream) return;
-
-      if (!isProcessing && webcam.readyState >= 2) {
+      if (!isProcessing && webcam.readyState === webcam.HAVE_ENOUGH_DATA) {
         isProcessing = true;
-
-        hiddenCtx.drawImage(webcam, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
-        const frameData = hiddenCanvas.toDataURL('image/jpeg', 0.8);
-
         try {
-          const response = await fetch('/api/recognize', {
+          hiddenCtx.drawImage(webcam, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+          const dataUrl = hiddenCanvas.toDataURL('image/jpeg', 0.85);
+
+          const response = await fetch('/api/recognize_frame', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: frameData, threshold: 80.0 }),
+            body: JSON.stringify({ image: dataUrl, threshold: 80.0 })
           });
 
-          const result = await response.json();
-
-          if (result.model_loaded === false) {
-            isRunning = false;
-            setStatus('Model not trained yet. Redirecting to registration...', 'warning', '⚠️');
-            setTimeout(() => {
-              window.location.href = '/register';
-            }, 2000);
-            return;
+          if (response.ok) {
+            const result = await response.json();
+            handleRecognitionResult(result);
           }
-
-          if (result.success && isRunning) {
-            renderFaceBoxes(result.faces);
-
-            if (result.faces && result.faces.length > 0) {
-              const primary = result.faces[0];
-
-              if (primary.matched && primary.name !== 'Unknown') {
-                // SUCCESS: Face is registered!
-                isRunning = false;
-                recognizedUser = primary.name;
-                unrecognizedConsecutiveCount = 0;
-                unknownWarning.style.display = 'none';
-
-                setStatus(`✅ Access Granted! Welcome, ${primary.name}! Opening profile...`, 'success', '🎉');
-
-                // Redirect to welcome page with verified user
-                setTimeout(() => {
-                  window.location.href = `/welcome?user=${encodeURIComponent(primary.name)}`;
-                }, 800);
-                return;
-              } else {
-                // UNKNOWN / UNREGISTERED FACE
-                unrecognizedConsecutiveCount++;
-                const remaining = Math.max(1, UNRECOGNIZED_LIMIT - unrecognizedConsecutiveCount);
-                unknownWarning.style.display = 'block';
-                countdownText.textContent = remaining;
-
-                setStatus(`Access Denied: Unrecognized Face (${primary.confidence} ≥ 80)`, 'danger', '🚫');
-
-                if (unrecognizedConsecutiveCount >= UNRECOGNIZED_LIMIT) {
-                  // Redirect back to landing page with warning message
-                  isRunning = false;
-                  setStatus('Face not registered! Redirecting to registration...', 'danger', '⚠️');
-                  setTimeout(() => {
-                    window.location.href = '/?msg=unregistered';
-                  }, 900);
-                  return;
-                }
-              }
-            } else {
-              // No face in frame
-              setStatus('Scanning... Please align your face inside the camera.', 'info', '🔍');
-            }
-          }
-        } catch (err) {
-          console.error('Recognition error:', err);
+        } catch (e) {
+          console.warn('Recognition frame dispatch error:', e);
         } finally {
           isProcessing = false;
         }
       }
 
       if (isRunning) {
-        setTimeout(recognitionLoop, 200);
+        setTimeout(runRecognitionLoop, 200);
       }
     }
 
+    function handleRecognitionResult(res) {
+      if (!res.face_detected) {
+        clearOverlay();
+        setStatus('No face detected in camera field. Please face the sensor.', 'scanning');
+        return;
+      }
+
+      const box = res.box;
+      const isRecognized = res.recognized && res.user && res.user !== 'Unknown';
+
+      if (isRecognized) {
+        unrecognizedConsecutiveCount = 0;
+        unknownWarning.style.display = 'none';
+
+        const confScore = res.confidence_score || Math.max(10, Math.min(100, Math.round(100 - (res.distance || 50))));
+        drawFaceBox(box.x, box.y, box.w, box.h, res.user, true, confScore);
+
+        setStatus(`Identity Verified: Welcome, ${res.user}! Access Granted.`, 'success');
+
+        isRunning = false;
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(t => t.stop());
+        }
+
+        setTimeout(() => {
+          window.location.href = `/welcome?user=${encodeURIComponent(res.user)}`;
+        }, 1200);
+
+      } else {
+        drawFaceBox(box.x, box.y, box.w, box.h, 'Unknown', false, 0);
+        unrecognizedConsecutiveCount++;
+
+        if (unrecognizedConsecutiveCount >= UNRECOGNIZED_LIMIT) {
+          isRunning = false;
+          if (mediaStream) {
+            mediaStream.getTracks().forEach(t => t.stop());
+          }
+
+          unknownWarning.style.display = 'flex';
+          let countdown = 3;
+          countdownText.textContent = countdown;
+          setStatus('Facial identity not enrolled in database.', 'warning');
+
+          const timer = setInterval(() => {
+            countdown--;
+            countdownText.textContent = countdown;
+            if (countdown <= 0) {
+              clearInterval(timer);
+              window.location.href = '/?msg=unregistered';
+            }
+          }, 1000);
+        } else {
+          setStatus('Analyzing biometric facial contours...', 'scanning');
+        }
+      }
+    }
+
+    window.addEventListener('load', startCamera);
     window.addEventListener('beforeunload', () => {
       isRunning = false;
       if (mediaStream) {
         mediaStream.getTracks().forEach(t => t.stop());
       }
     });
-
-    // Start immediately
-    startCamera();
   })();
   </script>
 </body>
 </html>
-

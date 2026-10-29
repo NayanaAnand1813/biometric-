@@ -1,21 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}Train Model - Face Recognition System{% endblock %}
+{% block title %}Model Compilation - FaceBio{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
-    <h1 class="page-title">Train Recognition Model</h1>
-    <p class="page-desc">Compile registered face samples into a persistent LBPH biometric classifier.</p>
+    <h1 class="page-title">Biometric Model Compilation</h1>
+    <p class="page-desc">Synthesize enrolled facial datasets into a high-performance LBPH classifier.</p>
   </div>
-  <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+  <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    <span>Back to Dashboard</span>
+  </a>
 </div>
 
 <!-- Retrain Warning Banner -->
 <div id="retrainAlertBanner" class="alert alert-warning" style="display: none;">
-  <span>⚠️</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+    <line x1="12" y1="9" x2="12" y2="13"/>
+    <line x1="12" y1="17" x2="12.01" y2="17"/>
+  </svg>
   <div>
-    <strong>Retraining Required:</strong> New face images were captured or a user was modified since the last training session.
+    <strong>Compilation Out of Sync:</strong> New face images were enrolled or modified since the last compile.
   </div>
 </div>
 
@@ -24,54 +31,62 @@
   <div style="display: flex; flex-direction: column; gap: 20px;">
     <div class="card">
       <div class="card-header">
-        <h2 class="card-title">Model Status & Trigger</h2>
+        <h2 class="card-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+          <span>Model Registry & Pipeline</span>
+        </h2>
       </div>
 
-      <div style="margin-bottom: 20px;">
-        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-color);">
-          <span style="color: var(--text-muted);">Current Status:</span>
+      <div style="margin-bottom: 22px;">
+        <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-subtle);">
+          <span style="color: var(--text-muted);">Current Engine State:</span>
           <span id="modelStatusBadge"><span class="badge badge-info">Checking...</span></span>
         </div>
-        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-color);">
-          <span style="color: var(--text-muted);">Trained Users (Classes):</span>
-          <strong id="trainedUsersCount">--</strong>
+        <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-subtle);">
+          <span style="color: var(--text-muted);">Compiled Identity Classes:</span>
+          <strong id="trainedUsersCount" style="color: #ffffff; font-family: var(--font-mono);">--</strong>
         </div>
-        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-color);">
-          <span style="color: var(--text-muted);">Last Trained:</span>
-          <span id="lastTrainedTime" style="color: var(--text-muted); font-size: 0.9rem;">--</span>
+        <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-subtle);">
+          <span style="color: var(--text-muted);">Last Compilation Timestamp:</span>
+          <span id="lastTrainedTime" style="color: var(--text-muted); font-size: 0.88rem; font-family: var(--font-mono);">--</span>
         </div>
-        <div style="display: flex; justify-content: space-between; padding: 10px 0;">
-          <span style="color: var(--text-muted);">Algorithm:</span>
-          <strong>OpenCV LBPH (Local Binary Patterns)</strong>
+        <div style="display: flex; justify-content: space-between; padding: 12px 0;">
+          <span style="color: var(--text-muted);">Architecture:</span>
+          <strong style="color: #38bdf8;">OpenCV LBPH (Local Binary Patterns)</strong>
         </div>
       </div>
 
       <!-- Action Button -->
-      <button id="trainBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 1.05rem;">
-        <span id="trainBtnIcon">🧠</span>
-        <span id="trainBtnText">Train Model Now</span>
+      <button id="trainBtn" class="btn btn-primary" style="width: 100%; padding: 15px; font-size: 1.02rem;">
+        <svg id="trainBtnIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+          <line x1="12" y1="22.08" x2="12" y2="12"/>
+        </svg>
+        <span id="trainBtnText">Compile Biometric Model Now</span>
       </button>
 
       <!-- Training Result Alert -->
-      <div id="trainResultAlert" class="alert alert-success" style="display: none; margin-top: 20px; flex-direction: column; align-items: flex-start; gap: 10px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 1.2rem;">✅</span>
-          <strong id="trainResultTitle">Model Trained Successfully!</strong>
+      <div id="trainResultAlert" class="alert alert-success" style="display: none; margin-top: 20px; flex-direction: column; align-items: flex-start; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <strong id="trainResultTitle" style="font-size: 1.02rem;">Compilation Successful!</strong>
         </div>
-        <p id="trainResultMessage" style="font-size: 0.9rem; color: var(--text-main); margin: 0;"></p>
-        <div style="margin-top: 10px; display: flex; gap: 10px;">
-          <a href="{{ url_for('recognize') }}" class="btn btn-success" style="font-size: 0.9rem;">
-            Test Recognition Now ➔
+        <p id="trainResultMessage" style="font-size: 0.9rem; color: #a7f3d0; margin: 0;"></p>
+        <div style="margin-top: 4px; display: flex; gap: 10px;">
+          <a href="{{ url_for('recognize') }}" class="btn btn-success btn-sm">
+            <span>Test Live Recognition</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14m-7-7 7 7-7 7"/></svg>
           </a>
-          <a href="{{ url_for('dashboard') }}" class="btn btn-secondary" style="font-size: 0.9rem;">
-            Dashboard
+          <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-sm">
+            <span>Return to Dashboard</span>
           </a>
         </div>
       </div>
 
       <!-- Error Alert -->
       <div id="trainErrorAlert" class="alert alert-danger" style="display: none; margin-top: 20px;">
-        <span>❌</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
         <div id="trainErrorText">An error occurred during training.</div>
       </div>
     </div>
@@ -79,13 +94,16 @@
     <!-- How LBPH Training Works -->
     <div class="card">
       <div class="card-header">
-        <h2 class="card-title">ℹ️ How Training Works</h2>
+        <h2 class="card-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>LBPH Feature Extraction</span>
+        </h2>
       </div>
-      <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.6;">
-        The LBPH (Local Binary Patterns Histograms) algorithm reads all 200 × 200 grayscale faces from the <code>faces/</code> directory. It analyzes local micro-texture patterns (edges, spots, flat areas) around each pixel and constructs a spatial histogram representing each person's facial geometry.
+      <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6;">
+        The LBPH (Local Binary Patterns Histograms) algorithm analyzes micro-textures around every normalized grayscale pixel, mapping patterns of contrast into spatial histogram vectors for each person.
       </p>
-      <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; margin-top: 10px;">
-        The trained weights are persisted to <code>models/face_model.yml</code>, and integer labels are written to <code>models/labels.json</code>. The model remains resident in memory for zero-latency live recognition.
+      <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6; margin-top: 10px;">
+        Model weights are persisted to <code style="color: #38bdf8; font-family: var(--font-mono);">models/face_model.yml</code> with label mappings stored in <code style="color: #38bdf8; font-family: var(--font-mono);">models/profiles.json</code>.
       </p>
     </div>
   </div>
@@ -93,27 +111,32 @@
   <!-- Right Column: Training Dataset Pre-Flight -->
   <div class="card">
     <div class="card-header">
-      <h2 class="card-title">Dataset Pre-Flight Check</h2>
+      <h2 class="card-title">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>Dataset Pre-Flight Audit</span>
+      </h2>
       <span id="datasetTotalBadge" class="badge badge-info">-- images</span>
     </div>
-    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
-      The following registered users and face samples will be compiled into the model:
+    <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
+      Verified face image folders queued for inclusion in the compilation cycle:
     </p>
 
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>User</th>
-          <th>Sample Count</th>
-          <th>Quality Status</th>
-        </tr>
-      </thead>
-      <tbody id="preflightTableBody">
-        <tr>
-          <td colspan="3" style="text-align: center; color: var(--text-muted);">Loading dataset details...</td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="data-table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>User Identity</th>
+            <th>Sample Count</th>
+            <th>Readiness</th>
+          </tr>
+        </thead>
+        <tbody id="preflightTableBody">
+          <tr>
+            <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 24px;">Scanning dataset directory...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -135,7 +158,7 @@
   const trainErrorText = document.getElementById('trainErrorText');
 
   function formatDate(timestamp) {
-    if (!timestamp) return 'Never';
+    if (!timestamp) return 'Never compiled';
     const date = new Date(timestamp * 1000);
     return date.toLocaleString();
   }
@@ -146,98 +169,87 @@
       const stats = await statsRes.json();
 
       datasetTotalBadge.textContent = `${stats.total_images} total images`;
-      trainedUsersCount.textContent = `${stats.registered_labels.length} users`;
+      trainedUsersCount.textContent = `${stats.registered_labels.length} classes`;
       lastTrainedTime.textContent = formatDate(stats.last_trained_time);
 
       if (stats.model_active) {
-        modelStatusBadge.innerHTML = '<span class="badge badge-success">Loaded & Active</span>';
+        modelStatusBadge.innerHTML = '<span class="badge badge-success">Compiled & Active</span>';
       } else if (stats.model_exists) {
-        modelStatusBadge.innerHTML = '<span class="badge badge-warning">Available on Disk</span>';
+        modelStatusBadge.innerHTML = '<span class="badge badge-warning">Compiled on Disk</span>';
       } else {
-        modelStatusBadge.innerHTML = '<span class="badge badge-danger">Not Trained</span>';
+        modelStatusBadge.innerHTML = '<span class="badge badge-danger">Not Compiled</span>';
       }
 
-      retrainAlertBanner.style.display = stats.model_needs_retrain ? 'flex' : 'none';
+      if (stats.model_needs_retrain) {
+        retrainAlertBanner.style.display = 'flex';
+      } else {
+        retrainAlertBanner.style.display = 'none';
+      }
 
-      // Load users table
+      // Pre-flight users table
       const usersRes = await fetch('/api/users');
       const usersData = await usersRes.json();
 
       if (!usersData.users || usersData.users.length === 0) {
-        preflightTableBody.innerHTML = `
-          <tr>
-            <td colspan="3" style="text-align: center; color: var(--accent-danger);">
-              No registered face images found. <a href="/register" style="color:#60a5fa; text-decoration:underline;">Register a face</a> first.
-            </td>
-          </tr>`;
+        preflightTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 24px;">No facial datasets detected in faces/ directory.</td></tr>';
         trainBtn.disabled = true;
+        trainBtnText.textContent = 'Cannot Compile: 0 Users';
         return;
       }
 
-      trainBtn.disabled = false;
-      preflightTableBody.innerHTML = usersData.users.map(u => {
-        let badge = '<span class="badge badge-success">Optimal (50 imgs)</span>';
-        if (u.image_count === 0) {
-          badge = '<span class="badge badge-danger">No images</span>';
-        } else if (u.image_count < 30) {
-          badge = `<span class="badge badge-warning">Low count (${u.image_count})</span>`;
-        } else if (u.image_count < 50) {
-          badge = `<span class="badge badge-info">Good (${u.image_count})</span>`;
-        }
+      preflightTableBody.innerHTML = usersData.users.map(u => `
+        <tr>
+          <td style="font-weight: 600; color: #ffffff;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="color: #38bdf8;"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <span>${u.name}</span>
+            </div>
+          </td>
+          <td><span class="badge badge-info">${u.image_count} / 50 samples</span></td>
+          <td>
+            ${u.image_count >= 10 
+              ? '<span class="badge badge-success">Ready</span>' 
+              : '<span class="badge badge-warning">Low Samples</span>'}
+          </td>
+        </tr>
+      `).join('');
 
-        return `
-          <tr>
-            <td style="font-weight: 600;">👤 ${u.name}</td>
-            <td>${u.image_count} images</td>
-            <td>${badge}</td>
-          </tr>
-        `;
-      }).join('');
+      trainBtn.disabled = false;
+      trainBtnText.textContent = 'Compile Biometric Model Now';
+
     } catch (err) {
       console.error('Failed to load training info:', err);
     }
   }
 
-  // Trigger Model Training
   trainBtn.addEventListener('click', async () => {
     trainBtn.disabled = true;
-    trainBtnIcon.innerHTML = '<span class="spinner"></span>';
-    trainBtnText.textContent = 'Training Model, Please Wait...';
+    trainBtnText.textContent = 'Compiling LBPH Matrix...';
     trainResultAlert.style.display = 'none';
     trainErrorAlert.style.display = 'none';
 
     try {
-      const response = await fetch('/api/train', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
+      const response = await fetch('/api/train', { method: 'POST' });
       const result = await response.json();
 
       if (result.success) {
-        trainResultMessage.innerHTML = `
-          Successfully trained LBPH model on <strong>${result.user_count} user(s)</strong> across <strong>${result.image_count} face images</strong>.<br>
-          Registered labels: ${result.users.map(u => `<code>${u}</code>`).join(', ')}.
-        `;
         trainResultAlert.style.display = 'flex';
-        await loadTrainingData();
+        trainResultMessage.textContent = result.message || `Compiled ${result.classes_trained || 'all'} classes successfully.`;
+        retrainAlertBanner.style.display = 'none';
+        loadTrainingData();
       } else {
-        trainErrorText.textContent = result.error || 'Failed to train model.';
         trainErrorAlert.style.display = 'flex';
+        trainErrorText.textContent = result.error || 'Failed to compile model.';
       }
     } catch (err) {
-      console.error('Training error:', err);
-      trainErrorText.textContent = 'Network or server error during model training.';
       trainErrorAlert.style.display = 'flex';
+      trainErrorText.textContent = `Network error during compilation: ${err.message}`;
     } finally {
       trainBtn.disabled = false;
-      trainBtnIcon.textContent = '🧠';
-      trainBtnText.textContent = 'Re-train Model';
+      trainBtnText.textContent = 'Compile Biometric Model Now';
     }
   });
 
-  // Initial load
   loadTrainingData();
 </script>
 {% endblock %}
-

@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Register Face - Biometric Profile</title>
+  <title>Biometric Enrollment - FaceBio</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>➕</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2338bdf8%22 stroke-width=%222%22><path d=%22M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2%22/><circle cx=%229%22 cy=%227%22 r=%224%22/><line x1=%2219%22 y1=%228%22 x2=%2219%22 y2=%2214%22/><line x1=%2222%22 y1=%2211%22 x2=%2216%22 y2=%2211%22/></svg>">
   <style>
     body {
       display: flex;
@@ -13,18 +13,27 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      background: linear-gradient(135deg, #0b1120 0%, #0f172a 100%);
       margin: 0;
-      padding: 24px 20px;
+      padding: 32px 20px;
     }
     .register-card {
       width: 100%;
-      max-width: 720px;
-      background-color: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
+      max-width: 740px;
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-xl);
       padding: 36px 32px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7);
+    }
+    .register-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-subtle);
     }
     .form-grid {
       display: grid;
@@ -35,144 +44,250 @@
     .full-width {
       grid-column: 1 / -1;
     }
-    /* Success Modal */
+    .input-with-icon {
+      position: relative;
+    }
+    .input-with-icon svg {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      color: var(--text-dim);
+      pointer-events: none;
+      transition: color var(--transition-fast);
+    }
+    .input-with-icon .form-control {
+      padding-left: 42px;
+    }
+    .input-with-icon .form-control:focus + svg,
+    .input-with-icon:focus-within svg {
+      color: var(--accent-cyan-light);
+    }
+    .progress-stats-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    /* Modal */
     .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(4px);
+      background: rgba(3, 7, 18, 0.85);
+      backdrop-filter: blur(8px);
       display: none;
       align-items: center;
       justify-content: center;
       z-index: 1000;
     }
     .modal-content {
-      background: var(--bg-secondary);
-      border: 2px solid #10b981;
-      border-radius: 20px;
-      padding: 36px 32px;
-      max-width: 460px;
+      background: #0f172a;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: var(--radius-xl);
+      padding: 40px 36px;
+      max-width: 480px;
       width: 90%;
       text-align: center;
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 35px rgba(16, 185, 129, 0.2);
       animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
     @keyframes popIn {
-      from { transform: scale(0.85); opacity: 0; }
+      from { transform: scale(0.9); opacity: 0; }
       to { transform: scale(1); opacity: 1; }
+    }
+    .modal-icon-circle {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: rgba(16, 185, 129, 0.15);
+      border: 2px solid #10b981;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #34d399;
+      margin-bottom: 20px;
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.35);
     }
   </style>
 </head>
 <body>
 
   <div class="register-card">
-    <!-- Top Navigation -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-      <a href="{{ url_for('landing_page') }}" class="btn btn-secondary" style="font-size: 0.85rem; padding: 8px 14px;">
-        ← Back to Home
+    <!-- Top Header -->
+    <div class="register-header">
+      <a href="{{ url_for('landing_page') }}" class="btn btn-secondary btn-sm">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="19" y1="12" x2="5" y2="12"/>
+          <polyline points="12 19 5 12 12 5"/>
+        </svg>
+        <span>Portal Home</span>
       </a>
-      <h2 style="font-size: 1.35rem; font-weight: 700; margin: 0;">New User Registration</h2>
-      <span class="badge badge-info">Profile & Biometrics</span>
+
+      <div>
+        <h2 style="font-size: 1.28rem; font-weight: 700; margin: 0;">New User Enrollment</h2>
+        <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">Profile Credentials & Biometric Vectoring</p>
+      </div>
+
+      <span class="badge badge-info">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>LBPH Pipeline</span>
+      </span>
     </div>
 
-    <!-- Required User Info Inputs -->
+    <!-- User Information Inputs -->
     <div class="form-grid">
       <div class="form-group">
         <label for="regName" class="form-label">Full Name *</label>
-        <input 
-          type="text" 
-          id="regName" 
-          class="form-control" 
-          placeholder="e.g. Nayana" 
-          maxlength="40"
-          required
-        >
+        <div class="input-with-icon">
+          <input 
+            type="text" 
+            id="regName" 
+            class="form-control" 
+            placeholder="e.g. Nayana Kumar" 
+            maxlength="40"
+            required
+            autocomplete="name"
+          >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
       </div>
 
       <div class="form-group">
         <label for="regPosition" class="form-label">Position / Role *</label>
-        <input 
-          type="text" 
-          id="regPosition" 
-          class="form-control" 
-          placeholder="e.g. Senior Software Engineer" 
-          maxlength="50"
-          required
-        >
+        <div class="input-with-icon">
+          <input 
+            type="text" 
+            id="regPosition" 
+            class="form-control" 
+            placeholder="e.g. Lead Engineer" 
+            maxlength="40"
+            required
+          >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+        </div>
       </div>
 
-      <div class="form-group full-width" style="margin-bottom: 10px;">
-        <label for="regEmail" class="form-label">Email Address *</label>
-        <input 
-          type="email" 
-          id="regEmail" 
-          class="form-control" 
-          placeholder="name@company.com" 
-          required
-        >
+      <div class="form-group full-width">
+        <label for="regEmail" class="form-label">Corporate Email Address *</label>
+        <div class="input-with-icon">
+          <input 
+            type="email" 
+            id="regEmail" 
+            class="form-control" 
+            placeholder="e.g. nayana@company.com" 
+            maxlength="60"
+            required
+            autocomplete="email"
+          >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </div>
       </div>
     </div>
 
-    <!-- Camera Stage -->
-    <div class="camera-stage" style="max-width: 600px; margin: 0 auto 16px auto;">
+    <!-- Camera HUD Viewfinder -->
+    <div id="cameraStage" class="camera-stage" style="margin: 0 auto 18px auto;">
+      <div class="camera-hud-tr"></div>
+      <div class="camera-hud-bl"></div>
+      <div class="camera-scan-line"></div>
+
       <div id="camPlaceholder" class="camera-placeholder">
-        <div class="camera-placeholder-icon">📷</div>
-        <p style="font-weight: 600;">Camera is Ready</p>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
-          Fill in your details above and click <strong>Start Capture</strong>.
+        <div class="camera-placeholder-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </div>
+        <p style="font-weight: 600; color: #ffffff;">Biometric Sensor Standby</p>
+        <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
+          Fill in Name, Role, and Email above to activate facial scanner.
         </p>
       </div>
+
       <video id="webcam" class="camera-video" autoplay playsinline muted style="display: none;"></video>
       <canvas id="overlay" class="overlay-canvas"></canvas>
       <canvas id="hiddenCanvas" style="display: none;"></canvas>
     </div>
 
-    <!-- Live Status Banner -->
-    <div id="statusBanner" class="alert alert-info" style="justify-content: center; font-weight: 600; font-size: 1rem; margin-bottom: 16px;">
-      <span id="statusIcon">ℹ️</span>
-      <span id="statusMessage">Enter your Name, Position, and Email to begin capture.</span>
-    </div>
-
-    <!-- Progress Tracker (0 to 50 samples) -->
-    <div id="progressTracker" style="display: none; margin-bottom: 16px;">
-      <div style="display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 600; margin-bottom: 6px;">
-        <span>Capturing Face Samples:</span>
-        <span id="progressText">0 / 50</span>
+    <!-- Sample Progress Tracker -->
+    <div id="progressTracker" style="display: none; margin-bottom: 18px;">
+      <div class="progress-stats-row">
+        <span>ENROLLMENT PROGRESS</span>
+        <strong id="progressText" style="color: #38bdf8;">0 / 50 SAMPLES</strong>
       </div>
-      <div class="progress-container" style="margin: 0;">
+      <div class="progress-container">
         <div id="progressBar" class="progress-bar"></div>
       </div>
     </div>
 
+    <!-- Live Status Banner -->
+    <div id="statusBanner" class="alert alert-info" style="justify-content: center; font-size: 0.94rem; margin-bottom: 20px;">
+      <svg id="statusIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="16" x2="12" y2="12"/>
+        <line x1="12" y1="8" x2="12.01" y2="8"/>
+      </svg>
+      <span id="statusMessage">Complete the profile form to activate sample capture.</span>
+    </div>
+
     <!-- Action Buttons -->
-    <div style="display: flex; gap: 12px;">
-      <button id="startCaptureBtn" class="btn btn-primary" style="flex: 1; padding: 14px; font-size: 1.05rem;" disabled>
-        <span>📸</span> Start Face Capture (50 Samples)
+    <div style="display: flex; gap: 14px;">
+      <button id="startCaptureBtn" class="btn btn-primary" style="flex: 1; padding: 14px; font-size: 1.02rem;" disabled>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        <span>Start Face Capture (50 Samples)</span>
       </button>
-      <button id="stopCaptureBtn" class="btn btn-danger" style="display: none; flex: 1; padding: 14px;">
-        <span>⏹️</span> Stop Capturing
+
+      <button id="stopCaptureBtn" class="btn btn-danger" style="display: none; flex: 1; padding: 14px; font-size: 1.02rem;">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="6" y="6" width="12" height="12"/>
+        </svg>
+        <span>Pause Capture</span>
       </button>
     </div>
   </div>
 
-  <!-- Success Modal Popup -->
-  <div id="successModal" class="modal-overlay">
+  <!-- Success Confirmation Modal -->
+  <div id="successModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-content">
-      <div style="font-size: 48px; margin-bottom: 12px;">🎉</div>
-      <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; color: #10b981;">
-        Details Saved Successfully!
-      </h2>
-      <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 20px;">
-        Your profile (Name, Email, Position) and 50 facial samples have been compiled into the model.
-      </p>
-      <div class="alert alert-success" style="font-size: 0.9rem; justify-content: center; margin-bottom: 20px;">
-        Redirecting to Landing Page in 2 seconds...
+      <div class="modal-icon-circle">
+        <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
       </div>
-      <button id="okModalBtn" class="btn btn-success" style="width: 100%; padding: 12px;">
-        Go to Login Now ➔
+
+      <h2 id="modalTitle" style="font-size: 1.55rem; font-weight: 800; margin-bottom: 8px; color: #ffffff;">
+        Biometric Profile Enrolled!
+      </h2>
+      <p style="color: var(--text-muted); font-size: 0.94rem; line-height: 1.5; margin-bottom: 20px;">
+        50 facial geometry samples and profile credentials have been compiled into the LBPH model.
+      </p>
+
+      <div class="alert alert-success" style="font-size: 0.88rem; justify-content: center; margin-bottom: 20px;">
+        Redirecting to Portal in 2 seconds...
+      </div>
+
+      <button id="okModalBtn" class="btn btn-success" style="width: 100%; padding: 13px;">
+        <span>Proceed to Face Login</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-7-7 7 7-7 7"/></svg>
       </button>
     </div>
   </div>
@@ -184,12 +299,12 @@
     const regEmail = document.getElementById('regEmail');
     const startCaptureBtn = document.getElementById('startCaptureBtn');
     const stopCaptureBtn = document.getElementById('stopCaptureBtn');
+    const cameraStage = document.getElementById('cameraStage');
     const webcam = document.getElementById('webcam');
     const overlay = document.getElementById('overlay');
     const hiddenCanvas = document.getElementById('hiddenCanvas');
     const camPlaceholder = document.getElementById('camPlaceholder');
     const statusBanner = document.getElementById('statusBanner');
-    const statusIcon = document.getElementById('statusIcon');
     const statusMessage = document.getElementById('statusMessage');
     const progressTracker = document.getElementById('progressTracker');
     const progressText = document.getElementById('progressText');
@@ -204,9 +319,8 @@
     let isCapturing = false;
     const TARGET_SAMPLES = 50;
 
-    function setStatus(msg, type = 'info', icon = 'ℹ️') {
+    function setStatus(msg, type = 'info') {
       statusBanner.className = `alert alert-${type}`;
-      statusIcon.textContent = icon;
       statusMessage.textContent = msg;
     }
 
@@ -217,7 +331,7 @@
 
       if (nameValid && posValid && emailValid) {
         startCaptureBtn.disabled = false;
-        setStatus('Ready! Click "Start Face Capture" to begin.', 'success', '✅');
+        setStatus('Form ready. Click "Start Face Capture" to begin sample enrollment.', 'success');
       } else {
         startCaptureBtn.disabled = true;
       }
@@ -239,6 +353,7 @@
         webcam.srcObject = mediaStream;
         webcam.style.display = 'block';
         camPlaceholder.style.display = 'none';
+        cameraStage.classList.add('active');
 
         webcam.onloadedmetadata = () => {
           overlay.width = webcam.videoWidth || 640;
@@ -249,7 +364,7 @@
         return true;
       } catch (err) {
         console.error('Camera error:', err);
-        setStatus('Could not access camera. Please allow camera permissions.', 'danger', '❌');
+        setStatus('Could not access camera. Please allow camera permissions in browser.', 'danger');
         return false;
       }
     }
@@ -265,9 +380,33 @@
       const scaleX = overlay.width / (hiddenCanvas.width || 640);
       const scaleY = overlay.height / (hiddenCanvas.height || 480);
 
-      overlayCtx.lineWidth = 3;
-      overlayCtx.strokeStyle = '#3b82f6';
-      overlayCtx.strokeRect(x * scaleX, y * scaleY, w * scaleX, h * scaleY);
+      const targetX = x * scaleX;
+      const targetY = y * scaleY;
+      const targetW = w * scaleX;
+      const targetH = h * scaleY;
+
+      overlayCtx.strokeStyle = '#38bdf8';
+      overlayCtx.lineWidth = 2.5;
+
+      const cornerLen = Math.min(targetW, targetH) * 0.25;
+
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(targetX, targetY + cornerLen);
+      overlayCtx.lineTo(targetX, targetY);
+      overlayCtx.lineTo(targetX + cornerLen, targetY);
+
+      overlayCtx.moveTo(targetX + targetW - cornerLen, targetY);
+      overlayCtx.lineTo(targetX + targetW, targetY);
+      overlayCtx.lineTo(targetX + targetW, targetY + cornerLen);
+
+      overlayCtx.moveTo(targetX + targetW, targetY + targetH - cornerLen);
+      overlayCtx.lineTo(targetX + targetW, targetY + targetH);
+      overlayCtx.lineTo(targetX + targetW - cornerLen, targetY + targetH);
+
+      overlayCtx.moveTo(targetX + cornerLen, targetY + targetH);
+      overlayCtx.lineTo(targetX, targetY + targetH);
+      overlayCtx.lineTo(targetX, targetY + targetH - cornerLen);
+      overlayCtx.stroke();
     }
 
     startCaptureBtn.addEventListener('click', async () => {
@@ -276,7 +415,7 @@
       const email = regEmail.value.trim();
 
       if (!name || !position || !email) {
-        setStatus('Please fill in Name, Position, and Email.', 'warning', '⚠️');
+        setStatus('Please complete Name, Position, and Email.', 'warning');
         return;
       }
 
@@ -285,23 +424,23 @@
 
       isCapturing = true;
       startCaptureBtn.style.display = 'none';
-      stopCaptureBtn.style.display = 'block';
+      stopCaptureBtn.style.display = 'inline-flex';
       [regName, regPosition, regEmail].forEach(i => i.disabled = true);
       progressTracker.style.display = 'block';
       progressBar.style.width = '0%';
       progressText.textContent = `0 / ${TARGET_SAMPLES}`;
 
-      setStatus(`Capturing 50 samples for "${name}". Please move head slightly...`, 'info', '📸');
+      setStatus(`Capturing 50 samples for "${name}". Please slowly tilt and rotate head...`, 'info');
       captureStep(name, email, position);
     });
 
     stopCaptureBtn.addEventListener('click', () => {
       isCapturing = false;
-      startCaptureBtn.style.display = 'block';
+      startCaptureBtn.style.display = 'inline-flex';
       stopCaptureBtn.style.display = 'none';
       [regName, regPosition, regEmail].forEach(i => i.disabled = false);
       clearOverlay();
-      setStatus('Capture paused by user.', 'info', '⏸️');
+      setStatus('Capture paused by operator.', 'info');
     });
 
     async function captureStep(name, email, position) {
@@ -331,7 +470,7 @@
           progressText.textContent = `${count} / ${TARGET_SAMPLES}`;
 
           if (result.box) drawBox(result.box);
-          setStatus(`Captured sample ${count}/${TARGET_SAMPLES}... Keep moving slightly.`, 'info', '📸');
+          setStatus(`Captured sample ${count}/${TARGET_SAMPLES}... Keep moving slightly for diverse angles.`, 'info');
 
           if (result.completed || count >= TARGET_SAMPLES) {
             isCapturing = false;
@@ -346,7 +485,7 @@
           }
         } else {
           if (result.error && result.error.includes('No face detected')) {
-            setStatus('No face detected. Look directly at camera in good lighting.', 'warning', '⚠️');
+            setStatus('No face detected. Please face the sensor in clear illumination.', 'warning');
           }
         }
       } catch (err) {
@@ -354,7 +493,7 @@
       }
 
       if (isCapturing) {
-        setTimeout(() => captureStep(name, email, position), 200);
+        setTimeout(() => captureStep(name, email, position), 180);
       }
     }
 

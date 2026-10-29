@@ -15,6 +15,7 @@
   const thresholdSlider = document.getElementById('thresholdSlider');
   const thresholdValueText = document.getElementById('thresholdValueText');
   const unloadedModelAlert = document.getElementById('unloadedModelAlert');
+  const cameraStage = document.getElementById('cameraStageDiagnostic');
 
   // Diagnostics & Status
   const matchStatusIcon = document.getElementById('matchStatusIcon');
@@ -32,14 +33,21 @@
   let isRecognizing = false;
   let isRequestPending = false;
   let recognitionTimeoutId = null;
-  const INFERENCE_INTERVAL_MS = 200; // ~5 requests per second for smooth AI response
+  const INFERENCE_INTERVAL_MS = 200;
 
-  // Threshold Slider
+  // Icons SVG dictionary
+  const ICONS = {
+    user: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+    verified: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`,
+    unknown: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#f43f5e" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+    scanning: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#38bdf8" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+    warning: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#f59e0b" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+  };
+
   thresholdSlider.addEventListener('input', () => {
     thresholdValueText.textContent = parseFloat(thresholdSlider.value).toFixed(1);
   });
 
-  // Check model status on page load
   async function checkInitialModelStatus() {
     try {
       const res = await fetch('/api/stats');
@@ -53,21 +61,17 @@
     }
   }
 
-  // 1. Start browser webcam
   async function startRecognitionCamera() {
     try {
       mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: 'user',
-        },
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
         audio: false,
       });
 
       video.srcObject = mediaStream;
       video.style.display = 'block';
       cameraPlaceholder.style.display = 'none';
+      if (cameraStage) cameraStage.classList.add('active');
 
       video.onloadedmetadata = () => {
         overlayCanvas.width = video.videoWidth || 640;
@@ -79,9 +83,8 @@
       startRecBtn.disabled = true;
       stopRecBtn.disabled = false;
       isRecognizing = true;
-      updateStatusCard('Scanning for faces...', 'Align your face in the camera frame', '👤', 'info', 'Scanning');
+      updateStatusCard('Scanning for faces...', 'Align your face in the camera frame', 'scanning', 'info', 'Scanning');
       
-      // Start recognition loop
       recognizeStep();
     } catch (err) {
       console.error('Camera access error:', err);
@@ -93,7 +96,6 @@
     }
   }
 
-  // 2. Stop camera cleanly
   function stopRecognitionCamera() {
     isRecognizing = false;
     if (recognitionTimeoutId) {
@@ -109,16 +111,16 @@
     video.srcObject = null;
     video.style.display = 'none';
     cameraPlaceholder.style.display = 'flex';
+    if (cameraStage) cameraStage.classList.remove('active');
     clearOverlay();
 
     startRecBtn.disabled = false;
     stopRecBtn.disabled = true;
-    updateStatusCard('Camera Inactive', 'Click "Start Recognition" to begin', '👤', 'info', 'Idle');
+    updateStatusCard('Camera Inactive', 'Click "Start Camera" to begin', 'user', 'info', 'Idle');
     diagFaceCount.textContent = '0';
     diagScore.textContent = '--';
   }
 
-  // Draw bounding boxes on overlay canvas
   function renderFaceBoxes(faces) {
     clearOverlay();
     if (!faces || faces.length === 0) return;
@@ -134,20 +136,38 @@
       const rh = h * scaleY;
 
       const isMatch = face.matched;
-      const boxColor = isMatch ? '#10b981' : '#ef4444';
+      const boxColor = isMatch ? '#10b981' : '#f43f5e';
       const labelText = isMatch 
-        ? `${face.name} (${face.confidence})`
-        : `Unknown (${face.confidence})`;
+        ? `VERIFIED: ${face.name.toUpperCase()} (DIST: ${face.confidence})`
+        : `UNKNOWN (DIST: ${face.confidence})`;
 
-      // Draw box
-      overlayCtx.lineWidth = 3;
+      // Cyber Corner Brackets
+      overlayCtx.lineWidth = 2.5;
       overlayCtx.strokeStyle = boxColor;
-      overlayCtx.strokeRect(rx, ry, rw, rh);
 
-      // Draw label background tag
-      overlayCtx.font = 'bold 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      const cornerLen = Math.min(rw, rh) * 0.25;
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(rx, ry + cornerLen);
+      overlayCtx.lineTo(rx, ry);
+      overlayCtx.lineTo(rx + cornerLen, ry);
+
+      overlayCtx.moveTo(rx + rw - cornerLen, ry);
+      overlayCtx.lineTo(rx + rw, ry);
+      overlayCtx.lineTo(rx + rw, ry + cornerLen);
+
+      overlayCtx.moveTo(rx + rw, ry + rh - cornerLen);
+      overlayCtx.lineTo(rx + rw, ry + rh);
+      overlayCtx.lineTo(rx + rw - cornerLen, ry + rh);
+
+      overlayCtx.moveTo(rx + cornerLen, ry + rh);
+      overlayCtx.lineTo(rx, ry + rh);
+      overlayCtx.lineTo(rx, ry + rh - cornerLen);
+      overlayCtx.stroke();
+
+      // Label background tag
+      overlayCtx.font = '600 12px "Plus Jakarta Sans", sans-serif';
       const textWidth = overlayCtx.measureText(labelText).width;
-      const tagHeight = 24;
+      const tagHeight = 22;
       const tagY = ry > tagHeight + 6 ? ry - tagHeight - 4 : ry + rh + 4;
 
       overlayCtx.fillStyle = boxColor;
@@ -155,7 +175,7 @@
 
       // Label text
       overlayCtx.fillStyle = '#ffffff';
-      overlayCtx.fillText(labelText, rx + 7, tagY + 17);
+      overlayCtx.fillText(labelText, rx + 7, tagY + 15);
     });
   }
 
@@ -163,21 +183,19 @@
     overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
   }
 
-  function updateStatusCard(name, subtext, icon, badgeType, badgeLabel) {
+  function updateStatusCard(name, subtext, iconKey, badgeType, badgeLabel) {
     matchName.textContent = name;
     matchSubtext.textContent = subtext;
-    matchStatusIcon.textContent = icon;
+    matchStatusIcon.innerHTML = ICONS[iconKey] || ICONS.user;
     matchBadgeContainer.innerHTML = `<span class="badge badge-${badgeType}">${badgeLabel}</span>`;
   }
 
-  // 3. Periodic Inference Loop with Overlap Prevention
   async function recognizeStep() {
     if (!isRecognizing || !mediaStream) return;
 
     if (!isRequestPending && video.readyState >= 2) {
       isRequestPending = true;
 
-      // Draw current frame to hidden capture canvas
       captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
       const frameData = captureCanvas.toDataURL('image/jpeg', 0.8);
       const currentThreshold = parseFloat(thresholdSlider.value) || 80.0;
@@ -203,7 +221,7 @@
               updateStatusCard(
                 `Welcome, ${primary.name}!`,
                 `Identity Verified (Distance: ${primary.confidence} < ${currentThreshold})`,
-                '🔓',
+                'verified',
                 'success',
                 'Verified'
               );
@@ -211,18 +229,18 @@
               updateStatusCard(
                 'Unregistered Face',
                 `Access Denied (Distance: ${primary.confidence} ≥ ${currentThreshold})`,
-                '🚫',
+                'unknown',
                 'danger',
                 'Unknown'
               );
             }
           } else {
             diagScore.textContent = '--';
-            updateStatusCard('Scanning for faces...', 'No face currently detected in frame', '🔍', 'warning', 'No Face');
+            updateStatusCard('Scanning for faces...', 'No face currently detected in frame', 'scanning', 'warning', 'No Face');
           }
         } else if (result.model_loaded === false) {
           unloadedModelAlert.style.display = 'flex';
-          updateStatusCard('Model Not Trained', 'Train the model first to recognize users', '⚠️', 'danger', 'No Model');
+          updateStatusCard('Model Not Trained', 'Train the model first to recognize users', 'warning', 'danger', 'No Model');
         }
       } catch (err) {
         console.error('Recognition API error:', err);
@@ -236,7 +254,6 @@
     }
   }
 
-  // Event Listeners
   startRecBtn.addEventListener('click', startRecognitionCamera);
   stopRecBtn.addEventListener('click', stopRecognitionCamera);
 
@@ -248,4 +265,3 @@
 
   checkInitialModelStatus();
 })();
-

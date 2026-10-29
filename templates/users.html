@@ -1,59 +1,72 @@
 {% extends "base.html" %}
 
-{% block title %}Registered Users - Face Recognition System{% endblock %}
+{% block title %}Enrolled Users - FaceBio{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
-    <h1 class="page-title">Registered Biometric Users</h1>
-    <p class="page-desc">Manage existing face registrations, sample counts, and dataset records.</p>
+    <h1 class="page-title">Enrolled User Database</h1>
+    <p class="page-desc">Directory of active biometric identities, dataset image counts, and audit logs.</p>
   </div>
   <div style="display: flex; gap: 10px;">
-    <button id="refreshUsersBtn" class="btn btn-secondary">
-      <span>🔄</span> Refresh List
+    <button id="refreshUsersBtn" class="btn btn-secondary btn-sm">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      <span>Refresh Directory</span>
     </button>
-    <a href="{{ url_for('register') }}" class="btn btn-primary">
-      <span>➕</span> Register New User
+    <a href="{{ url_for('register_page') }}" class="btn btn-primary btn-sm">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+      <span>Enroll New Identity</span>
     </a>
   </div>
 </div>
 
-<!-- Alert Banner if retraining is needed -->
+<!-- Retrain Alert Banner -->
 <div id="usersRetrainAlert" class="alert alert-warning" style="display: none;">
-  <span>⚠️</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+    <line x1="12" y1="9" x2="12" y2="13"/>
+    <line x1="12" y1="17" x2="12.01" y2="17"/>
+  </svg>
   <div>
     <strong>Model Retraining Recommended:</strong> A user's face data was modified or removed.
-    <a href="{{ url_for('train') }}" style="color: #fbbf24; text-decoration: underline; margin-left: 8px;">Retrain Model Now</a>
+    <a href="{{ url_for('train') }}" style="color: #fbbf24; text-decoration: underline; margin-left: 8px;">Recompile Model</a>
   </div>
 </div>
 
 <!-- Notification Toast/Alert -->
 <div id="userActionAlert" class="alert alert-success" style="display: none;">
-  <span id="userActionIcon">✅</span>
+  <svg id="userActionIconSvg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
   <span id="userActionText">Action completed successfully.</span>
 </div>
 
 <div class="card">
   <div class="card-header">
-    <h2 class="card-title">Stored Face Datasets (faces/ directory)</h2>
+    <h2 class="card-title">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>Enrolled Biometric Records</span>
+    </h2>
     <span id="totalUserCountBadge" class="badge badge-info">-- Users Registered</span>
   </div>
 
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>User Name</th>
-        <th>Face Samples</th>
-        <th>Data Status</th>
-        <th style="text-align: right;">Actions</th>
-      </tr>
-    </thead>
-    <tbody id="registeredUsersTbody">
-      <tr>
-        <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading registered users...</td>
-      </tr>
-    </tbody>
-  </table>
+  <div class="data-table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>User Profile</th>
+          <th>Dataset Samples</th>
+          <th>Dataset State</th>
+          <th style="text-align: right;">Directory Actions</th>
+        </tr>
+      </thead>
+      <tbody id="registeredUsersTbody">
+        <tr>
+          <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 28px;">Loading registered users...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}
 
@@ -66,12 +79,11 @@
   const actionAlert = document.getElementById('userActionAlert');
   const actionText = document.getElementById('userActionText');
 
-  function showActionAlert(message, type = 'success', icon = '✅') {
+  function showActionAlert(message, type = 'success') {
     actionAlert.className = `alert alert-${type}`;
-    document.getElementById('userActionIcon').textContent = icon;
     actionText.textContent = message;
     actionAlert.style.display = 'flex';
-    setTimeout(() => { actionAlert.style.display = 'none'; }, 6000);
+    setTimeout(() => { actionAlert.style.display = 'none'; }, 5000);
   }
 
   async function loadUsers() {
@@ -85,14 +97,14 @@
       const stats = await statsRes.json();
 
       retrainAlert.style.display = stats.model_needs_retrain ? 'flex' : 'none';
-      countBadge.textContent = `${usersData.users.length} Users Registered (${stats.total_images} Total Samples)`;
+      countBadge.textContent = `${usersData.users.length} Users (${stats.total_images} Total Samples)`;
 
       if (!usersData.users || usersData.users.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 32px;">
-              No registered users found in the <code>faces/</code> directory.<br>
-              <a href="/register" class="btn btn-primary" style="margin-top: 14px;">Register Your First Face</a>
+            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 36px;">
+              No enrolled users found in the system.<br>
+              <a href="/register" class="btn btn-primary btn-sm" style="margin-top: 16px;">Enroll First Identity</a>
             </td>
           </tr>
         `;
@@ -102,11 +114,14 @@
       tbody.innerHTML = usersData.users.map(u => `
         <tr>
           <td>
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(59, 130, 246, 0.2); display: flex; align-items: center; justify-content: center; font-size: 18px;">
-                👤
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(2, 132, 199, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; color: #38bdf8;">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
-              <strong style="font-size: 1rem;">${u.name}</strong>
+              <div>
+                <strong style="font-size: 0.98rem; color: #ffffff;">${u.name}</strong>
+                <div style="font-size: 0.78rem; color: var(--text-muted); font-family: var(--font-mono);">ID: faces/${u.name}</div>
+              </div>
             </div>
           </td>
           <td>
@@ -114,19 +129,20 @@
           </td>
           <td>
             ${u.image_count >= 50 
-              ? '<span class="badge badge-success">Complete (200x200)</span>' 
+              ? '<span class="badge badge-success">Normalized (200x200)</span>' 
               : '<span class="badge badge-warning">Partial Dataset</span>'}
           </td>
           <td style="text-align: right;">
-            <button class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85rem;" onclick="confirmDeleteUser('${u.name}')">
-              <span>🗑️</span> Delete
+            <button class="btn btn-danger btn-sm" onclick="confirmDeleteUser('${u.name}')">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              <span>Delete</span>
             </button>
           </td>
         </tr>
       `).join('');
     } catch (err) {
       console.error('Failed to load users:', err);
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-danger);">Error loading users list.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-rose); padding: 24px;">Error retrieving user records.</td></tr>';
     }
   }
 
@@ -144,14 +160,14 @@
       const result = await response.json();
 
       if (result.success) {
-        showActionAlert(result.message, 'success', '🗑️');
+        showActionAlert(result.message || `Deleted ${userName} successfully.`, 'success');
         await loadUsers();
       } else {
-        showActionAlert(result.error || 'Failed to delete user.', 'danger', '❌');
+        showActionAlert(result.error || 'Failed to delete user.', 'danger');
       }
     } catch (err) {
       console.error('Delete error:', err);
-      showActionAlert('Network error while deleting user.', 'danger', '❌');
+      showActionAlert('Network error while deleting user.', 'danger');
     }
   }
 
@@ -159,4 +175,3 @@
   loadUsers();
 </script>
 {% endblock %}
-
