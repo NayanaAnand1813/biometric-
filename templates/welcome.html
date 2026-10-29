@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome {{ profile.name }} - Access Granted</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎉</text></svg>">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0b1120 0%, #0f172a 100%);
+      margin: 0;
+      padding: 20px;
+    }
+    .welcome-card {
+      width: 100%;
+      max-width: 620px;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 40px 36px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      text-align: center;
+    }
+    .profile-details {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 24px;
+      margin: 28px 0;
+      text-align: left;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .detail-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .detail-label {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    .detail-value {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="welcome-card">
+    <!-- Success Badge -->
+    <div style="display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); border: 2px solid #10b981; font-size: 34px; margin-bottom: 18px; box-shadow: 0 0 25px rgba(16, 185, 129, 0.35);">
+      ✅
+    </div>
+
+    <!-- Welcome Headline -->
+    <h1 style="font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; color: #ffffff;">
+      Welcome, {{ profile.name }}!
+    </h1>
+    <p style="color: #34d399; font-size: 1.05rem; font-weight: 600;">
+      🔓 Identity Biometrically Verified • Access Granted
+    </p>
+
+    <!-- Profile Details Card (Name, Position, Email) -->
+    <div class="profile-details">
+      <div class="detail-row">
+        <span class="detail-label">👤 Full Name:</span>
+        <span class="detail-value">{{ profile.name }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">💼 Position / Role:</span>
+        <span class="detail-value" style="color: #60a5fa;">{{ profile.position }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">📧 Email Address:</span>
+        <span class="detail-value">{{ profile.email }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">🛡️ Verification Status:</span>
+        <span class="badge badge-success">LBPH Biometric Match</span>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div style="display: flex; gap: 14px;">
+      <a href="{{ url_for('landing_page') }}?msg=logged_out" class="btn btn-secondary" style="flex: 1; padding: 14px; border-radius: 10px;">
+        <span>🚪</span> Logout & Return Home
+      </a>
+      <a href="{{ url_for('login_page') }}" class="btn btn-primary" style="flex: 1; padding: 14px; border-radius: 10px;">
+        <span>🔄</span> Login Another Face
+      </a>
+    </div>
+  </div>
+
+</body>
+</html>
+

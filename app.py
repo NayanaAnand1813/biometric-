@@ -1,17 +1,22 @@
 """Flask Web Application for Biometric Face Recognition.
 
-Directly opens the browser to the 2-Option Portal (Register Face / Face Login)
-with silent terminal mode.
+Supports the multi-page workflow:
+1. Landing Page (/) -> Only Login and Register options with alerts
+2. /login -> Live Face Recognition -> /welcome (if recognized) or /?msg=unregistered (if unknown)
+3. /register -> Collects Name, Position, Email + 50 face samples -> Success popup -> /?msg=registered_success
+4. /welcome -> Displays Welcome message with Name, Position, Email, and verified status
+5. /dashboard, /recognize, /train, /users -> Admin and diagnostic pages
 """
 
 from __future__ import annotations
 
 import logging
+import socket
 import threading
 import webbrowser
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, url_for
 import flask.cli
 
 # Silent terminal output mode
@@ -34,44 +39,70 @@ face_service = FaceService()
 
 
 # -------------------------------------------------------------------------
-# Web Page Routes
+# Web Page Routes (Supporting both direct names and template aliases)
 # -------------------------------------------------------------------------
 
-@app.route("/")
-def index():
-    """Main Biometric Portal: 2 buttons (Login with Face / Register New Face)."""
-    return render_template("main.html")
+@app.route("/", endpoint="landing_page")
+@app.route("/home", endpoint="index")
+def landing_page():
+    """Landing Portal: ONLY Login and Register options with notification banners."""
+    msg = request.args.get("msg", "")
+    return render_template("landing.html", msg=msg)
 
 
-@app.route("/dashboard")
+@app.route("/login", endpoint="login_page")
+@app.route("/login_view", endpoint="login")
+def login_page():
+    """Login Page: Runs face recognition model.
+    If face is registered -> redirects to /welcome
+    If face is not registered -> redirects to /?msg=unregistered
+    """
+    return render_template("login.html")
+
+
+@app.route("/register", endpoint="register_page")
+@app.route("/register_view", endpoint="register")
+def register_page():
+    """Register Page: Collects Name, Email, Position, captures 50 face samples,
+    displays success popup, and redirects to landing page.
+    """
+    return render_template("register.html")
+
+
+@app.route("/welcome", endpoint="welcome_page")
+@app.route("/welcome_view", endpoint="welcome")
+def welcome_page():
+    """Welcome Page: Displays user name, position, email, and verified status."""
+    user = (request.args.get("user") or "").strip()
+    if not user:
+        return redirect(url_for("login_page"))
+
+    profile = face_service.get_user_profile(user)
+    return render_template("welcome.html", profile=profile)
+
+
+@app.route("/dashboard", endpoint="dashboard")
 def dashboard():
     """System Dashboard: Metrics, dataset counts, and diagnostics."""
     return render_template("dashboard.html")
 
 
-@app.route("/register")
-def register():
-    """Option 1: Face Registration Page (Webcam Capture)."""
-    return render_template("register.html")
-
-
-@app.route("/recognize")
-@app.route("/login")
+@app.route("/recognize", endpoint="recognize")
 def recognize():
-    """Option 2: Biometric Face Login / Recognition Page."""
+    """Live Recognition diagnostic page with sensitivity calibration."""
     return render_template(
         "recognize.html",
         default_threshold=DEFAULT_CONFIDENCE_THRESHOLD,
     )
 
 
-@app.route("/train")
+@app.route("/train", endpoint="train")
 def train():
-    """Model Training Page."""
+    """Model Training Page: Pre-flight check and model compilation."""
     return render_template("train.html")
 
 
-@app.route("/users")
+@app.route("/users", endpoint="users")
 def users():
     """Registered Users & Dataset Management Page."""
     return render_template("users.html")
@@ -90,9 +121,11 @@ def get_stats():
 
 @app.route("/api/register_frame", methods=["POST"])
 def register_frame():
-    """Receive a webcam frame and register face for the specified user."""
+    """Receive a webcam frame and register face + profile metadata."""
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip()
+    position = (data.get("position") or "").strip()
     image_data = data.get("image") or ""
 
     if not name:
@@ -101,15 +134,12 @@ def register_frame():
     if not image_data:
         return jsonify({"success": False, "error": "No image data provided."}), 400
 
-    result = face_service.register_frame(name, image_data)
-    status_code = 200 if result.get("success") else 400
-    return jsonify(result), status_code
-
-
-@app.route("/api/train", methods=["POST"])
-def train_model():
-    """Trigger model training on stored faces."""
-    result = face_service.train_model()
+    result = face_service.register_frame(
+        person_name=name,
+        image_data=image_data,
+        email=email,
+        position=position,
+    )
     status_code = 200 if result.get("success") else 400
     return jsonify(result), status_code
 
@@ -132,9 +162,24 @@ def recognize_frame():
     return jsonify(result)
 
 
+@app.route("/api/train", methods=["POST"])
+def train_model():
+    """Trigger model training on stored faces."""
+    result = face_service.train_model()
+    status_code = 200 if result.get("success") else 400
+    return jsonify(result), status_code
+
+
+@app.route("/api/profile/<username>", methods=["GET"])
+def get_profile(username: str):
+    """Return stored user profile."""
+    profile = face_service.get_user_profile(username)
+    return jsonify({"success": True, "profile": profile})
+
+
 @app.route("/api/users", methods=["GET"])
 def list_users():
-    """Return all registered users and their image counts."""
+    """Return all registered users and their details."""
     users_list = face_service.get_registered_users()
     return jsonify({"success": True, "users": users_list})
 
@@ -147,10 +192,12 @@ def delete_user(username: str):
     return jsonify(result), status_code
 
 
-import socket
+# -------------------------------------------------------------------------
+# Smart Port Finder & Silent Browser Launcher
+# -------------------------------------------------------------------------
 
 def find_available_port(preferred_port=5000) -> int:
-    """Find an open port to prevent collisions with other background projects."""
+    """Find an open port to avoid collisions with any other background projects."""
     for port in [preferred_port, 5050, 5055, 8080]:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             if s.connect_ex(("127.0.0.1", port)) != 0:
@@ -159,10 +206,10 @@ def find_available_port(preferred_port=5000) -> int:
 
 
 def run_app():
-    """Start the application and open the browser without terminal clutter."""
+    """Start application and open the browser to the clean 2-choice landing page."""
     port = find_available_port(5000)
     url = f"http://127.0.0.1:{port}"
-    timer = threading.Timer(0.8, lambda: webbrowser.open_new(url))
+    timer = threading.Timer(2.5, lambda: webbrowser.open_new(url))
     timer.daemon = True
     timer.start()
     app.run(host="127.0.0.1", port=port, debug=False)

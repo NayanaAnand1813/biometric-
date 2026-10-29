@@ -2,13 +2,14 @@
 
 Encapsulates face detection (Haar Cascade), advanced LBPH preprocessing
 (CLAHE illumination normalization, Gaussian denoising, and mirror augmentation),
-real-time prediction, dataset management, and persistence using
+real-time prediction, dataset management, profile management, and persistence using
 pathlib-based relative paths.
 """
 
 from __future__ import annotations
 
 import base64
+from datetime import datetime
 import json
 import logging
 import os
@@ -30,6 +31,7 @@ MODELS_DIR = BASE_DIR / "models"
 CASCADE_PATH = BASE_DIR / "haarcascade_frontalface_default.xml"
 MODEL_PATH = MODELS_DIR / "face_model.yml"
 LABELS_PATH = MODELS_DIR / "labels.json"
+PROFILES_PATH = MODELS_DIR / "profiles.json"
 
 TARGET_FACE_SIZE = (200, 200)
 MAX_REGISTRATION_IMAGES = 50
@@ -139,20 +141,11 @@ class FaceService:
 
     @staticmethod
     def preprocess_face(face_gray: np.ndarray) -> np.ndarray:
-        """Standardized image preprocessing for maximum LBPH recognition accuracy.
-        
-        1. Ensures uniform 200x200 pixel resolution.
-        2. Applies Gaussian blur to eliminate camera sensor grain/noise.
-        3. Applies CLAHE (Contrast Limited Adaptive Histogram Equalization)
-           for lighting invariance across varied illumination conditions.
-        """
+        """Standardized image preprocessing for maximum LBPH recognition accuracy."""
         if face_gray.shape != TARGET_FACE_SIZE:
             face_gray = cv2.resize(face_gray, TARGET_FACE_SIZE)
 
-        # Smooth camera sensor noise while preserving key facial edges
         denoised = cv2.GaussianBlur(face_gray, (3, 3), 0)
-
-        # CLAHE with 8x8 spatial tiles for balanced local illumination
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         return clahe.apply(denoised)
 
@@ -169,12 +162,78 @@ class FaceService:
         )
         return [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in faces]
 
-    def register_frame(self, person_name: str, image_data: str) -> Dict[str, Any]:
-        """Process, normalize, and save a single frame for user face registration.
-        
-        Detects primary face, applies CLAHE contrast normalization,
-        and saves 200x200 sample to faces/<person_name>/<count>.jpg.
-        """
+    # -------------------------------------------------------------------------
+    # Profile Metadata Management
+    # -------------------------------------------------------------------------
+
+    def get_user_profile(self, user_name: str) -> Dict[str, Any]:
+        """Fetch stored profile metadata (name, email, position) for a user."""
+        clean_name = self.sanitize_user_name(user_name)
+        profiles: Dict[str, Any] = {}
+
+        if PROFILES_PATH.exists():
+            try:
+                with open(PROFILES_PATH, "r", encoding="utf-8") as f:
+                    profiles = json.load(f)
+            except Exception as e:
+                logger.warning("Could not read profiles: %s", e)
+
+        for key, prof in profiles.items():
+            if key.lower() == clean_name.lower():
+                return {
+                    "name": prof.get("name", clean_name),
+                    "email": prof.get("email", f"{clean_name.lower()}@company.com"),
+                    "position": prof.get("position", "Team Member"),
+                    "registered_at": prof.get("registered_at", "Recently"),
+                }
+
+        return {
+            "name": clean_name or "Verified Member",
+            "email": f"{clean_name.lower().replace(' ', '.')}@company.com" if clean_name else "user@company.com",
+            "position": "Team Member",
+            "registered_at": "Active",
+        }
+
+    def save_user_profile(self, user_name: str, email: str, position: str) -> None:
+        """Save or update user profile metadata (name, email, position)."""
+        clean_name = self.sanitize_user_name(user_name)
+        if not clean_name:
+            return
+
+        profiles: Dict[str, Any] = {}
+        if PROFILES_PATH.exists():
+            try:
+                with open(PROFILES_PATH, "r", encoding="utf-8") as f:
+                    profiles = json.load(f)
+            except Exception:
+                profiles = {}
+
+        profiles[clean_name] = {
+            "name": clean_name,
+            "email": (email or "").strip() or f"{clean_name.lower()}@company.com",
+            "position": (position or "").strip() or "Team Member",
+            "registered_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+        try:
+            with open(PROFILES_PATH, "w", encoding="utf-8") as f:
+                json.dump(profiles, f, indent=2)
+            logger.info("Saved profile for %s", clean_name)
+        except Exception as exc:
+            logger.error("Failed to save profile: %s", exc)
+
+    # -------------------------------------------------------------------------
+    # Frame Registration & Model Training
+    # -------------------------------------------------------------------------
+
+    def register_frame(
+        self,
+        person_name: str,
+        image_data: str,
+        email: str = "",
+        position: str = "",
+    ) -> Dict[str, Any]:
+        """Process, normalize, and save a single frame for user face registration."""
         clean_name = self.sanitize_user_name(person_name)
         if not clean_name:
             return {
@@ -191,6 +250,10 @@ class FaceService:
             if f.is_file() and f.suffix.lower() in (".jpg", ".jpeg", ".png")
         ]
         current_count = len(existing_images)
+
+        # Save profile metadata on first frame or if fields provided
+        if email or position or current_count == 0:
+            self.save_user_profile(clean_name, email, position)
 
         if current_count >= MAX_REGISTRATION_IMAGES:
             return {
@@ -221,15 +284,12 @@ class FaceService:
                 "max_count": MAX_REGISTRATION_IMAGES,
             }
 
-        # Select the largest face by area
         detected_faces.sort(key=lambda b: b[2] * b[3], reverse=True)
         x, y, w, h = detected_faces[0]
 
-        # Crop and preprocess face (resize + denoise + CLAHE)
         face_roi = gray[y : y + h, x : x + w]
         face_normalized = self.preprocess_face(face_roi)
 
-        # Increment count and save
         new_count = current_count + 1
         save_path = user_dir / f"{new_count}.jpg"
         cv2.imwrite(str(save_path), face_normalized)
@@ -237,6 +297,7 @@ class FaceService:
         # Auto-train model when 50 images are reached so the user can immediately login
         if new_count >= MAX_REGISTRATION_IMAGES:
             try:
+                self.save_user_profile(clean_name, email, position)
                 self.train_model()
             except Exception as exc:
                 logger.warning("Auto-training upon registration completion failed: %s", exc)
@@ -262,7 +323,6 @@ class FaceService:
             labels_list: List[int] = []
             label_dict: Dict[int, str] = {}
 
-            # Read user folders in deterministic sorted order
             user_dirs = sorted([d for d in FACES_DIR.iterdir() if d.is_dir()])
 
             if not user_dirs:
@@ -280,10 +340,8 @@ class FaceService:
                     if img_file.is_file() and img_file.suffix.lower() in (".jpg", ".jpeg", ".png"):
                         img = cv2.imread(str(img_file), cv2.IMREAD_GRAYSCALE)
                         if img is not None:
-                            # Apply CLAHE preprocessing
                             processed = self.preprocess_face(img)
                             user_images.append(processed)
-                            # Data augmentation: horizontal flip for head-angle invariance
                             user_images.append(cv2.flip(processed, 1))
                             total_raw_images += 1
 
@@ -301,7 +359,6 @@ class FaceService:
                 }
 
             try:
-                # Optimized LBPH recognizer: 8x8 spatial grid with radius=1
                 recognizer = cv2.face.LBPHFaceRecognizer_create(
                     radius=1,
                     neighbors=8,
@@ -310,12 +367,10 @@ class FaceService:
                 )
                 recognizer.train(training_faces, np.array(labels_list, dtype=np.int32))
 
-                # Persist model and labels
                 recognizer.write(str(MODEL_PATH))
                 with open(LABELS_PATH, "w", encoding="utf-8") as f:
                     json.dump(label_dict, f, indent=2)
 
-                # Update in-memory state
                 self.recognizer = recognizer
                 self.labels = label_dict
                 self.model_needs_retrain = False
@@ -327,7 +382,7 @@ class FaceService:
                     "image_count": total_raw_images,
                     "augmented_samples": len(training_faces),
                     "users": list(label_dict.values()),
-                    "message": f"Successfully trained model with {len(label_dict)} users ({total_raw_images} samples, {len(training_faces)} augmented training patterns).",
+                    "message": f"Successfully trained model with {len(label_dict)} users.",
                 }
             except Exception as exc:
                 logger.error("Model training failed: %s", exc)
@@ -363,8 +418,7 @@ class FaceService:
         gray = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
         detected_boxes = self.detect_faces(gray)
 
-        # Fallback: If input frame is already a cropped face sample (<= 240x240)
-        # where Haar cascade misses due to missing outer borders
+        # Fallback if image is tightly-cropped
         if not detected_boxes and gray.shape[0] <= 240 and gray.shape[1] <= 240:
             detected_boxes = [(0, 0, gray.shape[1], gray.shape[0])]
 
@@ -372,22 +426,20 @@ class FaceService:
 
         for (x, y, w, h) in detected_boxes:
             face_roi = gray[y : y + h, x : x + w]
-            # Standardized preprocessing (CLAHE + blur) identical to training
             face_processed = self.preprocess_face(face_roi)
 
             try:
                 label_id, confidence = self.recognizer.predict(face_processed)
                 confidence = float(confidence)
 
-                # Lower confidence indicates closer distance
                 is_match = confidence < threshold
                 if is_match and label_id in self.labels:
                     name = self.labels[label_id]
+                    profile = self.get_user_profile(name)
                 else:
                     name = "Unknown"
+                    profile = None
 
-                # Calculate an intuitive match accuracy percentage
-                # At distance 0 -> 100%, at distance = threshold -> ~50%
                 accuracy_pct = max(
                     0.0,
                     min(100.0, round(100.0 - (confidence / max(threshold, 1.0)) * 50.0, 1)),
@@ -397,6 +449,7 @@ class FaceService:
                     {
                         "box": [x, y, w, h],
                         "name": name,
+                        "profile": profile,
                         "label_id": int(label_id) if is_match else -1,
                         "confidence": round(confidence, 1),
                         "accuracy_pct": accuracy_pct,
@@ -416,26 +469,44 @@ class FaceService:
 
     def get_registered_users(self) -> List[Dict[str, Any]]:
         """List registered users and their image count."""
-        users: List[Dict[str, Any]] = []
-        if not FACES_DIR.exists():
-            return users
+        users: Dict[str, Dict[str, Any]] = {}
 
-        for item in sorted(FACES_DIR.iterdir()):
-            if item.is_dir():
-                valid_images = [
-                    f for f in item.iterdir()
-                    if f.is_file() and f.suffix.lower() in (".jpg", ".jpeg", ".png")
-                ]
-                users.append(
-                    {
+        if FACES_DIR.exists():
+            for item in sorted(FACES_DIR.iterdir()):
+                if item.is_dir():
+                    valid_images = [
+                        f for f in item.iterdir()
+                        if f.is_file() and f.suffix.lower() in (".jpg", ".jpeg", ".png")
+                    ]
+                    profile = self.get_user_profile(item.name)
+                    users[item.name] = {
                         "name": item.name,
                         "image_count": len(valid_images),
+                        "email": profile.get("email", ""),
+                        "position": profile.get("position", ""),
                     }
-                )
-        return users
+
+        # Ensure all trained labels are included
+        for name in self.labels.values():
+            if name not in users:
+                profile = self.get_user_profile(name)
+                user_dir = FACES_DIR / name
+                user_dir.mkdir(parents=True, exist_ok=True)
+                count = len([
+                    f for f in user_dir.iterdir()
+                    if f.is_file() and f.suffix.lower() in (".jpg", ".jpeg", ".png")
+                ])
+                users[name] = {
+                    "name": name,
+                    "image_count": count or 50,
+                    "email": profile.get("email", ""),
+                    "position": profile.get("position", ""),
+                }
+
+        return list(users.values())
 
     def delete_user(self, person_name: str) -> Dict[str, Any]:
-        """Safely delete a registered user and their images."""
+        """Safely delete a registered user, images, and profile."""
         clean_name = self.sanitize_user_name(person_name)
         if not clean_name:
             return {"success": False, "error": "Invalid user name specified."}
@@ -451,6 +522,18 @@ class FaceService:
 
         try:
             shutil.rmtree(target_dir)
+
+            if PROFILES_PATH.exists():
+                try:
+                    with open(PROFILES_PATH, "r", encoding="utf-8") as f:
+                        profiles = json.load(f)
+                    if clean_name in profiles:
+                        del profiles[clean_name]
+                    with open(PROFILES_PATH, "w", encoding="utf-8") as f:
+                        json.dump(profiles, f, indent=2)
+                except Exception:
+                    pass
+
             self.model_needs_retrain = True
             return {
                 "success": True,

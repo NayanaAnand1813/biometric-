@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biometric Face Recognition System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👤</text></svg>">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0b1120 0%, #0f172a 100%);
+      margin: 0;
+      padding: 20px;
+    }
+    .landing-card {
+      width: 100%;
+      max-width: 760px;
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 48px 40px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      text-align: center;
+    }
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 36px;
+    }
+    .choice-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 2px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.25s ease;
+      cursor: pointer;
+    }
+    .choice-box:hover {
+      transform: translateY(-4px);
+    }
+    .choice-box.login:hover {
+      border-color: #10b981;
+      box-shadow: 0 10px 25px rgba(16, 185, 129, 0.25);
+    }
+    .choice-box.register:hover {
+      border-color: #3b82f6;
+      box-shadow: 0 10px 25px rgba(59, 130, 246, 0.25);
+    }
+    .choice-icon {
+      width: 68px;
+      height: 68px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin-bottom: 18px;
+    }
+    .choice-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .choice-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    @media (max-width: 640px) {
+      .action-grid {
+        grid-template-columns: 1fr;
+      }
+      .landing-card {
+        padding: 32px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="landing-card">
+    <!-- Header -->
+    <div style="display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); font-size: 32px; margin-bottom: 16px; box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);">
+      👁️
+    </div>
+    <h1 style="font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px;">
+      Biometric Face Recognition System
+    </h1>
+    <p style="color: var(--text-muted); font-size: 1.05rem; max-width: 520px; margin: 0 auto;">
+      Welcome. Please select an option below to proceed.
+    </p>
+
+    <!-- Notification Banners -->
+    {% if msg == 'unregistered' %}
+    <div class="alert alert-danger" style="margin-top: 24px; text-align: left; justify-content: center; font-weight: 600;">
+      <span>⚠️</span>
+      <span>Please register before login. Unrecognized face detected.</span>
+    </div>
+    {% elif msg == 'registered_success' %}
+    <div class="alert alert-success" style="margin-top: 24px; text-align: left; justify-content: center; font-weight: 600;">
+      <span>🎉</span>
+      <span>Details and face samples saved successfully! You can now login.</span>
+    </div>
+    {% elif msg == 'logged_out' %}
+    <div class="alert alert-info" style="margin-top: 24px; text-align: left; justify-content: center; font-weight: 600;">
+      <span>ℹ️</span>
+      <span>You have been safely logged out.</span>
+    </div>
+    {% endif %}
+
+    <!-- ONLY 2 OPTIONS: LOGIN & REGISTER -->
+    <div class="action-grid">
+      
+      <!-- Option 1: Face Login -->
+      <a href="{{ url_for('login_page') }}" class="choice-box login">
+        <div class="choice-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+          🔓
+        </div>
+        <div class="choice-title" style="color: #34d399;">Login with Face</div>
+        <p class="choice-desc">
+          Scan your face using the webcam. If registered, your profile will open automatically.
+        </p>
+        <span class="btn btn-success" style="margin-top: 20px; width: 100%; border-radius: 10px;">
+          Start Login ➔
+        </span>
+      </a>
+
+      <!-- Option 2: Register New Face -->
+      <a href="{{ url_for('register_page') }}" class="choice-box register">
+        <div class="choice-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
+          ➕
+        </div>
+        <div class="choice-title" style="color: #60a5fa;">Register New Face</div>
+        <p class="choice-desc">
+          Enter your name, email, and position, then capture 50 face samples to register.
+        </p>
+        <span class="btn btn-primary" style="margin-top: 20px; width: 100%; border-radius: 10px;">
+          Register Now ➔
+        </span>
+      </a>
+
+    </div>
+
+    <!-- Minimal System Info -->
+    <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border-color); font-size: 0.85rem; color: var(--text-muted); display: flex; justify-content: center; align-items: center; gap: 8px;">
+      <span class="pulse-dot"></span>
+      <span>OpenCV LBPH Biometric Engine • Illumination Equalized</span>
+    </div>
+  </div>
+
+</body>
+</html>
+
