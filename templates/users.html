@@ -8,7 +8,7 @@
     <h1 class="page-title">Enrolled User Database</h1>
     <p class="page-desc">Directory of active biometric identities, dataset image counts, and audit logs.</p>
   </div>
-  <div style="display: flex; gap: 10px;">
+  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
     <button id="refreshUsersBtn" class="btn btn-secondary btn-sm">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
       <span>Refresh Directory</span>
@@ -17,6 +17,10 @@
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
       <span>Enroll New Identity</span>
     </a>
+    <button id="deleteAllBtn" class="btn btn-danger btn-sm" onclick="confirmDeleteAllUsers()" title="Developer action: completely wipe all stored faces and reset model">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      <span>Developer: Delete All Faces</span>
+    </button>
   </div>
 </div>
 
@@ -168,6 +172,31 @@
     } catch (err) {
       console.error('Delete error:', err);
       showActionAlert('Network error while deleting user.', 'danger');
+    }
+  }
+
+  async function confirmDeleteAllUsers() {
+    const confirmed = confirm(
+      "DEVELOPER WARNING: Delete ALL registered users and reset the biometric model?\n\nThis will completely purge all face image folders in faces/ and reset the classifier."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch('/api/users/delete_all', {
+        method: 'POST',
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        showActionAlert(result.message || 'All registered faces deleted successfully.', 'success');
+        await loadUsers();
+      } else {
+        showActionAlert(result.error || 'Failed to delete all users.', 'danger');
+      }
+    } catch (err) {
+      console.error('Delete all error:', err);
+      showActionAlert('Network error while clearing datasets.', 'danger');
     }
   }
 

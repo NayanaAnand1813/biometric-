@@ -98,10 +98,16 @@
         <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">LBPH Real-Time Face Authentication</p>
       </div>
 
-      <span class="badge badge-success">
-        <span class="pulse-dot" style="width: 6px; height: 6px;" aria-hidden="true"></span>
-        <span>Sensor Active</span>
-      </span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <a href="{{ url_for('users') }}" class="btn btn-secondary btn-sm" title="Developer tool: remove or reset registered faces" style="color: #f87171; border-color: rgba(248, 113, 113, 0.3);">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          <span>Delete Faces</span>
+        </a>
+        <span class="badge badge-success">
+          <span class="pulse-dot" style="width: 6px; height: 6px;" aria-hidden="true"></span>
+          <span>Sensor Active</span>
+        </span>
+      </div>
     </div>
 
     <!-- Futuristic Cyber Camera HUD Stage -->
@@ -166,7 +172,7 @@
     let isRunning = true;
     let recognizedUser = null;
     let unrecognizedConsecutiveCount = 0;
-    const UNRECOGNIZED_LIMIT = 5;
+    const UNRECOGNIZED_LIMIT = 30; // ~6 seconds of continuous scanning before redirecting
 
     function setStatus(msg, state = 'scanning') {
       statusBanner.className = `live-status-card ${state}`;
@@ -269,10 +275,10 @@
           hiddenCtx.drawImage(webcam, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
           const dataUrl = hiddenCanvas.toDataURL('image/jpeg', 0.85);
 
-          const response = await fetch('/api/recognize_frame', {
+          const response = await fetch('/api/recognize', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: dataUrl, threshold: 80.0 })
+            body: JSON.stringify({ image: dataUrl, threshold: 85.0 })
           });
 
           if (response.ok) {
@@ -292,23 +298,46 @@
     }
 
     function handleRecognitionResult(res) {
-      if (!res.face_detected) {
+      const faces = res.faces || [];
+      const hasFace = res.face_detected || (faces.length > 0);
+
+      if (!hasFace) {
         clearOverlay();
-        setStatus('No face detected in camera field. Please face the sensor.', 'scanning');
+        setStatus('Scanning for face... Please look directly into the camera.', 'scanning');
         return;
       }
 
-      const box = res.box;
-      const isRecognized = res.recognized && res.user && res.user !== 'Unknown';
+      // Extract primary face attributes
+      let box, isRecognized, userName, confScore, dist;
+      if (faces.length > 0) {
+        const primary = faces[0];
+        box = primary.box;
+        isRecognized = primary.matched && primary.name && primary.name !== 'Unknown';
+        userName = primary.name;
+        confScore = primary.accuracy_pct || Math.max(10, Math.min(100, Math.round(100 - (primary.confidence || 50))));
+        dist = primary.confidence;
+      } else {
+        box = res.box;
+        isRecognized = res.recognized && res.user && res.user !== 'Unknown';
+        userName = res.user;
+        confScore = res.confidence_score || 85;
+        dist = res.distance;
+      }
+
+      // Normalize bounding coordinates
+      let bx = 0, by = 0, bw = 0, bh = 0;
+      if (Array.isArray(box)) {
+        [bx, by, bw, bh] = box;
+      } else if (box && typeof box === 'object') {
+        bx = box.x || 0; by = box.y || 0; bw = box.w || 0; bh = box.h || 0;
+      }
 
       if (isRecognized) {
         unrecognizedConsecutiveCount = 0;
         unknownWarning.style.display = 'none';
 
-        const confScore = res.confidence_score || Math.max(10, Math.min(100, Math.round(100 - (res.distance || 50))));
-        drawFaceBox(box.x, box.y, box.w, box.h, res.user, true, confScore);
-
-        setStatus(`Identity Verified: Welcome, ${res.user}! Access Granted.`, 'success');
+        drawFaceBox(bx, by, bw, bh, userName, true, confScore);
+        setStatus(`Identity Verified: Welcome, ${userName}! Access Granted.`, 'success');
 
         isRunning = false;
         if (mediaStream) {
@@ -316,11 +345,11 @@
         }
 
         setTimeout(() => {
-          window.location.href = `/welcome?user=${encodeURIComponent(res.user)}`;
+          window.location.href = `/welcome?user=${encodeURIComponent(userName)}`;
         }, 1200);
 
       } else {
-        drawFaceBox(box.x, box.y, box.w, box.h, 'Unknown', false, 0);
+        drawFaceBox(bx, by, bw, bh, 'Analyzing Face...', false, 0);
         unrecognizedConsecutiveCount++;
 
         if (unrecognizedConsecutiveCount >= UNRECOGNIZED_LIMIT) {
@@ -330,7 +359,7 @@
           }
 
           unknownWarning.style.display = 'flex';
-          let countdown = 3;
+          let countdown = 4;
           countdownText.textContent = countdown;
           setStatus('Facial identity not enrolled in database.', 'warning');
 
@@ -343,7 +372,7 @@
             }
           }, 1000);
         } else {
-          setStatus('Analyzing biometric facial contours...', 'scanning');
+          setStatus(`Analyzing facial geometry... (Scanning ${unrecognizedConsecutiveCount}/${UNRECOGNIZED_LIMIT})`, 'scanning');
         }
       }
     }

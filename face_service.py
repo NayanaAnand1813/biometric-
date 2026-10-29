@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import shutil
+import stat
 import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -23,6 +24,32 @@ import cv2
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+def safe_rmtree(path_to_remove: Path) -> None:
+    """Robust directory removal on Windows and OneDrive clearing read-only flags."""
+    if not path_to_remove.exists():
+        return
+    for root, dirs, files in os.walk(str(path_to_remove), topdown=False):
+        for f in files:
+            p = os.path.join(root, f)
+            try:
+                os.chmod(p, stat.S_IWRITE)
+                os.remove(p)
+            except Exception:
+                pass
+        for d in dirs:
+            p = os.path.join(root, d)
+            try:
+                os.chmod(p, stat.S_IWRITE)
+                os.rmdir(p)
+            except Exception:
+                pass
+    try:
+        os.chmod(str(path_to_remove), stat.S_IWRITE)
+        os.rmdir(str(path_to_remove))
+    except Exception:
+        pass
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent
@@ -35,7 +62,7 @@ PROFILES_PATH = MODELS_DIR / "profiles.json"
 
 TARGET_FACE_SIZE = (200, 200)
 MAX_REGISTRATION_IMAGES = 50
-DEFAULT_CONFIDENCE_THRESHOLD = 80.0
+DEFAULT_CONFIDENCE_THRESHOLD = 85.0
 
 
 class FaceService:
@@ -521,7 +548,7 @@ class FaceService:
             return {"success": False, "error": f"User '{clean_name}' does not exist."}
 
         try:
-            shutil.rmtree(target_dir)
+            safe_rmtree(target_dir)
 
             if PROFILES_PATH.exists():
                 try:
@@ -534,17 +561,68 @@ class FaceService:
                 except Exception:
                     pass
 
-            self.model_needs_retrain = True
+            # Auto-recompile or reset the model immediately
+            remaining_users = [
+                d for d in FACES_DIR.iterdir()
+                if d.is_dir() and any(f.suffix.lower() in (".jpg", ".jpeg", ".png") for f in d.iterdir() if f.is_file())
+            ]
+            if remaining_users:
+                self.train_model()
+            else:
+                if MODEL_PATH.exists():
+                    MODEL_PATH.unlink()
+                if LABELS_PATH.exists():
+                    LABELS_PATH.unlink()
+                self.recognizer = None
+                self.labels = {}
+                self.model_needs_retrain = False
+
             return {
                 "success": True,
-                "message": f"Successfully deleted registration data for '{clean_name}'. Model retraining is recommended.",
-                "needs_retrain": True,
+                "message": f"Successfully deleted registration data for '{clean_name}'. Biometric model updated.",
+                "needs_retrain": False,
             }
         except Exception as exc:
             return {
                 "success": False,
                 "error": f"Failed to delete user directory: {exc}",
             }
+
+    def delete_all_users(self) -> Dict[str, Any]:
+        """Developer tool: Completely wipe all registered face datasets and model weights."""
+        with self._lock:
+            try:
+                deleted_count = 0
+                if FACES_DIR.exists():
+                    for item in FACES_DIR.iterdir():
+                        if item.is_dir():
+                            safe_rmtree(item)
+                            deleted_count += 1
+
+                if PROFILES_PATH.exists():
+                    with open(PROFILES_PATH, "w", encoding="utf-8") as f:
+                        json.dump({}, f, indent=2)
+
+                if MODEL_PATH.exists():
+                    MODEL_PATH.unlink()
+
+                if LABELS_PATH.exists():
+                    LABELS_PATH.unlink()
+
+                self.recognizer = None
+                self.labels = {}
+                self.model_needs_retrain = False
+
+                return {
+                    "success": True,
+                    "deleted_users": deleted_count,
+                    "message": f"Successfully cleared all {deleted_count} registered users and reset the recognition model.",
+                }
+            except Exception as exc:
+                return {
+                    "success": False,
+                    "error": f"Failed to delete all users: {exc}",
+                }
 
     def get_system_stats(self) -> Dict[str, Any]:
         """Return system statistics for dashboard."""

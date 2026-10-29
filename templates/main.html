@@ -102,7 +102,12 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
           <span>Registered Users</span>
         </strong>
-        <span id="usersCountBadge" class="badge badge-info">-- Users</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="usersCountBadge" class="badge badge-info">-- Users</span>
+          <a href="{{ url_for('users') }}" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 0.76rem; color: #f87171;" title="Developer tool: manage or delete face profiles">
+            Delete / Manage
+          </a>
+        </div>
       </div>
       <div id="usersPillContainer" style="display: flex; flex-wrap: wrap; gap: 8px;">
         <span style="font-size: 0.84rem; color: var(--text-muted);">Loading database...</span>
@@ -186,14 +191,33 @@
       }
 
       usersPillContainer.innerHTML = data.users.map(u => `
-        <span class="badge badge-success" style="padding: 4px 10px; font-size: 0.82rem; text-transform: none;">
-          ${u.name} (${u.image_count})
+        <span class="badge badge-success" style="padding: 4px 10px; font-size: 0.82rem; text-transform: none; display: inline-flex; align-items: center; gap: 8px;">
+          <span>${u.name} (${u.image_count})</span>
+          <button onclick="event.stopPropagation(); quickDeleteUser('${u.name}')" title="Delete face data for ${u.name}" style="background: none; border: none; color: #fecdd3; cursor: pointer; padding: 0; font-size: 15px; line-height: 1; font-weight: bold;">&times;</button>
         </span>
       `).join('');
     } catch (e) {
       console.error('Failed to load users:', e);
     }
   }
+
+  window.quickDeleteUser = async function(userName) {
+    const ok = confirm(`Developer action: Delete face profile for "${userName}"?`);
+    if (!ok) return;
+
+    try {
+      const res = await fetch(`/api/users/${encodeURIComponent(userName)}`, { method: 'DELETE' });
+      const result = await res.json();
+      if (result.success) {
+        setStatus(`Deleted "${userName}". Model updated.`, 'info');
+        await loadUsersList();
+      } else {
+        alert(result.error || 'Failed to delete user.');
+      }
+    } catch (e) {
+      alert('Network error while deleting user.');
+    }
+  };
 
   async function ensureCamera() {
     if (mediaStream) return true;

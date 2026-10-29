@@ -144,7 +144,8 @@ def register_frame():
     return jsonify(result), status_code
 
 
-@app.route("/api/recognize", methods=["POST"])
+@app.route("/api/recognize", methods=["POST"], endpoint="api_recognize")
+@app.route("/api/recognize_frame", methods=["POST"], endpoint="api_recognize_frame")
 def recognize_frame():
     """Detect and recognize faces in the incoming webcam frame."""
     data = request.get_json(silent=True) or {}
@@ -159,6 +160,27 @@ def recognize_frame():
         threshold = DEFAULT_CONFIDENCE_THRESHOLD
 
     result = face_service.recognize_frame(image_data, threshold=threshold)
+
+    # Attach backward-compatible top-level convenience properties
+    faces = result.get("faces", [])
+    if faces:
+        primary = faces[0]
+        result["face_detected"] = True
+        result["box"] = primary.get("box")
+        result["recognized"] = bool(primary.get("matched"))
+        result["user"] = primary.get("name") if primary.get("matched") else "Unknown"
+        result["confidence_score"] = primary.get("accuracy_pct", 0)
+        result["distance"] = primary.get("confidence", 999.0)
+        result["profile"] = primary.get("profile")
+    else:
+        result["face_detected"] = False
+        result["box"] = None
+        result["recognized"] = False
+        result["user"] = None
+        result["confidence_score"] = 0
+        result["distance"] = 0
+        result["profile"] = None
+
     return jsonify(result)
 
 
@@ -188,6 +210,14 @@ def list_users():
 def delete_user(username: str):
     """Safely delete a user and their face images."""
     result = face_service.delete_user(username)
+    status_code = 200 if result.get("success") else 400
+    return jsonify(result), status_code
+
+
+@app.route("/api/users/delete_all", methods=["POST", "DELETE"])
+def delete_all_users():
+    """Developer tool: Completely delete all registered faces and reset model."""
+    result = face_service.delete_all_users()
     status_code = 200 if result.get("success") else 400
     return jsonify(result), status_code
 

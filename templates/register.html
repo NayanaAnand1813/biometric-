@@ -476,11 +476,19 @@
             isCapturing = false;
             clearOverlay();
             
+            // Auto-compile model to ensure instant recognition on login
+            try {
+              setStatus('Compiling biometric model with your 50 samples...', 'info');
+              await fetch('/api/train', { method: 'POST' });
+            } catch (e) {
+              console.warn('Post-registration train trigger error:', e);
+            }
+
             successModal.style.display = 'flex';
 
             setTimeout(() => {
               window.location.href = '/?msg=registered_success';
-            }, 2000);
+            }, 2500);
             return;
           }
         } else {
