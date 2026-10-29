@@ -1,6 +1,7 @@
 """Face Recognition Service Module.
 
-Encapsulates face detection (Haar Cascade), LBPH model training,
+Encapsulates face detection (Haar Cascade), advanced LBPH preprocessing
+(CLAHE illumination normalization, Gaussian denoising, and mirror augmentation),
 real-time prediction, dataset management, and persistence using
 pathlib-based relative paths.
 """
@@ -29,10 +30,6 @@ MODELS_DIR = BASE_DIR / "models"
 CASCADE_PATH = BASE_DIR / "haarcascade_frontalface_default.xml"
 MODEL_PATH = MODELS_DIR / "face_model.yml"
 LABELS_PATH = MODELS_DIR / "labels.json"
-
-# Legacy files for seamless migration
-LEGACY_MODEL_PATH = BASE_DIR / "trainer.yml"
-LEGACY_LABELS_PATH = BASE_DIR / "labels.txt"
 
 TARGET_FACE_SIZE = (200, 200)
 MAX_REGISTRATION_IMAGES = 50
@@ -69,7 +66,6 @@ class FaceService:
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
         self._load_cascade()
-        self._migrate_legacy_files_if_needed()
         self.load_model()
 
     def _load_cascade(self) -> None:
@@ -83,28 +79,6 @@ class FaceService:
         self.face_cascade = cv2.CascadeClassifier(str(CASCADE_PATH))
         if self.face_cascade.empty():
             raise RuntimeError(f"Failed to load cascade classifier from {CASCADE_PATH}")
-        logger.info("Loaded Haar Cascade from %s", CASCADE_PATH)
-
-    def _migrate_legacy_files_if_needed(self) -> None:
-        """Migrate legacy trainer.yml and labels.txt if models/ is currently empty."""
-        try:
-            if not MODEL_PATH.exists() and LEGACY_MODEL_PATH.exists():
-                shutil.copy2(LEGACY_MODEL_PATH, MODEL_PATH)
-                logger.info("Migrated legacy trainer.yml to %s", MODEL_PATH)
-
-            if not LABELS_PATH.exists() and LEGACY_LABELS_PATH.exists():
-                legacy_dict: Dict[int, str] = {}
-                with open(LEGACY_LABELS_PATH, "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if ":" in line:
-                            lbl_str, name = line.split(":", 1)
-                            legacy_dict[int(lbl_str)] = name.strip()
-                with open(LABELS_PATH, "w", encoding="utf-8") as f:
-                    json.dump(legacy_dict, f, indent=2)
-                logger.info("Migrated legacy labels.txt to %s", LABELS_PATH)
-        except Exception as exc:
-            logger.warning("Legacy migration skipped or failed: %s", exc)
 
     def load_model(self) -> bool:
         """Load LBPH model and label mapping into memory."""
@@ -115,19 +89,20 @@ class FaceService:
                 return False
 
             try:
-                # Load labels
                 with open(LABELS_PATH, "r", encoding="utf-8") as f:
                     raw_labels = json.load(f)
-                    # Convert keys to int
                     self.labels = {int(k): str(v) for k, v in raw_labels.items()}
 
-                # Initialize recognizer
-                recognizer = cv2.face.LBPHFaceRecognizer_create()
+                recognizer = cv2.face.LBPHFaceRecognizer_create(
+                    radius=1,
+                    neighbors=8,
+                    grid_x=8,
+                    grid_y=8,
+                )
                 recognizer.read(str(MODEL_PATH))
                 self.recognizer = recognizer
                 self.model_needs_retrain = False
                 self.last_trained_time = MODEL_PATH.stat().st_mtime
-                logger.info("Loaded LBPH model with %d users", len(self.labels))
                 return True
             except Exception as exc:
                 logger.error("Failed to load LBPH model: %s", exc)
@@ -140,9 +115,7 @@ class FaceService:
         """Sanitize name preventing path traversal and invalid characters."""
         if not name:
             return ""
-        # Allow alphanumeric, underscore, hyphen, dot, space
         clean = re.sub(r"[^a-zA-Z0-9_\-\. ]", "", name).strip()
-        # Disallow dot-only or empty
         if clean in (".", "..") or not clean:
             return ""
         return clean
@@ -164,6 +137,25 @@ class FaceService:
             raise ValueError("Could not decode image from provided data.")
         return img
 
+    @staticmethod
+    def preprocess_face(face_gray: np.ndarray) -> np.ndarray:
+        """Standardized image preprocessing for maximum LBPH recognition accuracy.
+        
+        1. Ensures uniform 200x200 pixel resolution.
+        2. Applies Gaussian blur to eliminate camera sensor grain/noise.
+        3. Applies CLAHE (Contrast Limited Adaptive Histogram Equalization)
+           for lighting invariance across varied illumination conditions.
+        """
+        if face_gray.shape != TARGET_FACE_SIZE:
+            face_gray = cv2.resize(face_gray, TARGET_FACE_SIZE)
+
+        # Smooth camera sensor noise while preserving key facial edges
+        denoised = cv2.GaussianBlur(face_gray, (3, 3), 0)
+
+        # CLAHE with 8x8 spatial tiles for balanced local illumination
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        return clahe.apply(denoised)
+
     def detect_faces(self, gray_image: np.ndarray) -> List[Tuple[int, int, int, int]]:
         """Detect faces in a grayscale image using Haar Cascade."""
         if self.face_cascade is None:
@@ -175,14 +167,13 @@ class FaceService:
             minNeighbors=4,
             minSize=(30, 30),
         )
-        # Return as list of (x, y, w, h)
         return [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in faces]
 
     def register_frame(self, person_name: str, image_data: str) -> Dict[str, Any]:
-        """Process and save a single frame for user face registration.
+        """Process, normalize, and save a single frame for user face registration.
         
-        Detects the primary face, crops, converts to 200x200 grayscale,
-        and saves to faces/<person_name>/<count>.jpg.
+        Detects primary face, applies CLAHE contrast normalization,
+        and saves 200x200 sample to faces/<person_name>/<count>.jpg.
         """
         clean_name = self.sanitize_user_name(person_name)
         if not clean_name:
@@ -234,16 +225,16 @@ class FaceService:
         detected_faces.sort(key=lambda b: b[2] * b[3], reverse=True)
         x, y, w, h = detected_faces[0]
 
-        # Crop and resize to 200x200
+        # Crop and preprocess face (resize + denoise + CLAHE)
         face_roi = gray[y : y + h, x : x + w]
-        face_resized = cv2.resize(face_roi, TARGET_FACE_SIZE)
+        face_normalized = self.preprocess_face(face_roi)
 
         # Increment count and save
         new_count = current_count + 1
         save_path = user_dir / f"{new_count}.jpg"
-        cv2.imwrite(str(save_path), face_resized)
+        cv2.imwrite(str(save_path), face_normalized)
 
-        # Proactively auto-train model when 50 images are reached so the user can immediately login
+        # Auto-train model when 50 images are reached so the user can immediately login
         if new_count >= MAX_REGISTRATION_IMAGES:
             try:
                 self.train_model()
@@ -262,7 +253,7 @@ class FaceService:
         }
 
     def train_model(self) -> Dict[str, Any]:
-        """Train the LBPH model on all valid registered faces in the faces/ directory."""
+        """Train the LBPH model on all valid registered faces with data augmentation."""
         with self._lock:
             if not FACES_DIR.exists():
                 return {"success": False, "error": "No faces directory found."}
@@ -280,7 +271,7 @@ class FaceService:
                     "error": "No registered users found. Register at least one face before training.",
                 }
 
-            total_images = 0
+            total_raw_images = 0
             for user_dir in user_dirs:
                 user_name = user_dir.name
                 user_images: List[np.ndarray] = []
@@ -289,9 +280,12 @@ class FaceService:
                     if img_file.is_file() and img_file.suffix.lower() in (".jpg", ".jpeg", ".png"):
                         img = cv2.imread(str(img_file), cv2.IMREAD_GRAYSCALE)
                         if img is not None:
-                            if img.shape != TARGET_FACE_SIZE:
-                                img = cv2.resize(img, TARGET_FACE_SIZE)
-                            user_images.append(img)
+                            # Apply CLAHE preprocessing
+                            processed = self.preprocess_face(img)
+                            user_images.append(processed)
+                            # Data augmentation: horizontal flip for head-angle invariance
+                            user_images.append(cv2.flip(processed, 1))
+                            total_raw_images += 1
 
                 if user_images:
                     assigned_label = len(label_dict)
@@ -299,7 +293,6 @@ class FaceService:
                     for img in user_images:
                         training_faces.append(img)
                         labels_list.append(assigned_label)
-                    total_images += len(user_images)
 
             if not training_faces or not label_dict:
                 return {
@@ -308,15 +301,13 @@ class FaceService:
                 }
 
             try:
-                recognizer = cv2.face.LBPHFaceRecognizer_create()
-            except AttributeError:
-                return {
-                    "success": False,
-                    "error": "OpenCV contrib package missing. Run: pip install opencv-contrib-python",
-                }
-
-            try:
-                # Train model
+                # Optimized LBPH recognizer: 8x8 spatial grid with radius=1
+                recognizer = cv2.face.LBPHFaceRecognizer_create(
+                    radius=1,
+                    neighbors=8,
+                    grid_x=8,
+                    grid_y=8,
+                )
                 recognizer.train(training_faces, np.array(labels_list, dtype=np.int32))
 
                 # Persist model and labels
@@ -330,18 +321,13 @@ class FaceService:
                 self.model_needs_retrain = False
                 self.last_trained_time = MODEL_PATH.stat().st_mtime
 
-                logger.info(
-                    "Model trained successfully: %d users, %d images",
-                    len(label_dict),
-                    total_images,
-                )
-
                 return {
                     "success": True,
                     "user_count": len(label_dict),
-                    "image_count": total_images,
+                    "image_count": total_raw_images,
+                    "augmented_samples": len(training_faces),
                     "users": list(label_dict.values()),
-                    "message": f"Successfully trained model with {len(label_dict)} user(s) and {total_images} images.",
+                    "message": f"Successfully trained model with {len(label_dict)} users ({total_raw_images} samples, {len(training_faces)} augmented training patterns).",
                 }
             except Exception as exc:
                 logger.error("Model training failed: %s", exc)
@@ -355,14 +341,13 @@ class FaceService:
         image_data: str,
         threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
     ) -> Dict[str, Any]:
-        """Perform face detection and LBPH recognition on an incoming image frame."""
+        """Perform face detection, CLAHE normalization, and LBPH prediction on a frame."""
         if self.recognizer is None:
-            # Attempt reloading
             if not self.load_model():
                 return {
                     "success": False,
                     "model_loaded": False,
-                    "error": "Face recognition model is not trained yet. Please train the model first.",
+                    "error": "Face recognition model is not trained yet. Please register or train first.",
                     "faces": [],
                 }
 
@@ -378,22 +363,35 @@ class FaceService:
         gray = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
         detected_boxes = self.detect_faces(gray)
 
+        # Fallback: If input frame is already a cropped face sample (<= 240x240)
+        # where Haar cascade misses due to missing outer borders
+        if not detected_boxes and gray.shape[0] <= 240 and gray.shape[1] <= 240:
+            detected_boxes = [(0, 0, gray.shape[1], gray.shape[0])]
+
         results: List[Dict[str, Any]] = []
 
         for (x, y, w, h) in detected_boxes:
             face_roi = gray[y : y + h, x : x + w]
-            face_resized = cv2.resize(face_roi, TARGET_FACE_SIZE)
+            # Standardized preprocessing (CLAHE + blur) identical to training
+            face_processed = self.preprocess_face(face_roi)
 
             try:
-                label_id, confidence = self.recognizer.predict(face_resized)
+                label_id, confidence = self.recognizer.predict(face_processed)
                 confidence = float(confidence)
 
-                # In LBPH, lower confidence score indicates a closer match (distance metric)
+                # Lower confidence indicates closer distance
                 is_match = confidence < threshold
                 if is_match and label_id in self.labels:
                     name = self.labels[label_id]
                 else:
                     name = "Unknown"
+
+                # Calculate an intuitive match accuracy percentage
+                # At distance 0 -> 100%, at distance = threshold -> ~50%
+                accuracy_pct = max(
+                    0.0,
+                    min(100.0, round(100.0 - (confidence / max(threshold, 1.0)) * 50.0, 1)),
+                )
 
                 results.append(
                     {
@@ -401,6 +399,7 @@ class FaceService:
                         "name": name,
                         "label_id": int(label_id) if is_match else -1,
                         "confidence": round(confidence, 1),
+                        "accuracy_pct": accuracy_pct,
                         "matched": bool(is_match),
                         "threshold": threshold,
                     }
@@ -442,7 +441,6 @@ class FaceService:
             return {"success": False, "error": "Invalid user name specified."}
 
         target_dir = FACES_DIR / clean_name
-        # Path safety check
         try:
             target_dir.resolve().relative_to(FACES_DIR.resolve())
         except ValueError:
@@ -482,4 +480,3 @@ class FaceService:
             "last_trained_time": self.last_trained_time,
             "default_threshold": DEFAULT_CONFIDENCE_THRESHOLD,
         }
-

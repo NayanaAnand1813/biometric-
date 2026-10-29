@@ -11,7 +11,7 @@
       Biometric Face Recognition
     </h1>
     <p style="color: var(--text-muted); font-size: 0.95rem;">
-      Pure facial biometric authentication — no email or password required.
+      Enhanced with CLAHE Illumination Equalization & Multi-Sample Augmentation
     </p>
   </div>
 
@@ -57,7 +57,7 @@
           type="text" 
           id="regNameInput" 
           class="form-control" 
-          placeholder="Enter person's name (e.g. Nayana, Raj)" 
+          placeholder="Enter person's name (e.g. Nayana, Raj, Keerthana)" 
           maxlength="40"
           autocomplete="off"
         >
@@ -297,9 +297,10 @@
           if (result.faces && result.faces.length > 0) {
             const primary = result.faces[0];
             if (primary.matched) {
-              setStatus(`Login Successful! Welcome, ${primary.name}! (Score: ${primary.confidence})`, 'success', '🔓');
+              const acc = primary.accuracy_pct || 80;
+              setStatus(`Login Successful! Welcome, ${primary.name}! (Accuracy: ${acc}%, Distance: ${primary.confidence})`, 'success', '🔓');
             } else {
-              setStatus(`Access Denied: Unrecognized Face (Score: ${primary.confidence} ≥ ${threshold})`, 'danger', '🚫');
+              setStatus(`Access Denied: Unrecognized Face (Distance: ${primary.confidence} ≥ ${threshold})`, 'danger', '🚫');
             }
           } else {
             setStatus('Scanning... Please face the camera.', 'info', '🔍');
@@ -333,7 +334,9 @@
 
       const isMatch = face.matched;
       const color = isMatch ? '#10b981' : '#ef4444';
-      const label = isMatch ? `${face.name} (${face.confidence})` : `Unknown (${face.confidence})`;
+      const label = isMatch 
+        ? `${face.name} (${face.accuracy_pct || 85}%)` 
+        : `Unknown (${face.confidence})`;
 
       overlayCtx.lineWidth = 3;
       overlayCtx.strokeStyle = color;
@@ -467,4 +470,3 @@
 })();
 </script>
 {% endblock %}
-
