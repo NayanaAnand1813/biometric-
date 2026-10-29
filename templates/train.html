@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Train Model - Face Recognition System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Train Recognition Model</h1>
+    <p class="page-desc">Compile registered face samples into a persistent LBPH biometric classifier.</p>
+  </div>
+  <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+
+<!-- Retrain Warning Banner -->
+<div id="retrainAlertBanner" class="alert alert-warning" style="display: none;">
+  <span>⚠️</span>
+  <div>
+    <strong>Retraining Required:</strong> New face images were captured or a user was modified since the last training session.
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- Left Column: Training Controls & Status -->
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Model Status & Trigger</h2>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-color);">
+          <span style="color: var(--text-muted);">Current Status:</span>
+          <span id="modelStatusBadge"><span class="badge badge-info">Checking...</span></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-color);">
+          <span style="color: var(--text-muted);">Trained Users (Classes):</span>
+          <strong id="trainedUsersCount">--</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-color);">
+          <span style="color: var(--text-muted);">Last Trained:</span>
+          <span id="lastTrainedTime" style="color: var(--text-muted); font-size: 0.9rem;">--</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 10px 0;">
+          <span style="color: var(--text-muted);">Algorithm:</span>
+          <strong>OpenCV LBPH (Local Binary Patterns)</strong>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <button id="trainBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 1.05rem;">
+        <span id="trainBtnIcon">🧠</span>
+        <span id="trainBtnText">Train Model Now</span>
+      </button>
+
+      <!-- Training Result Alert -->
+      <div id="trainResultAlert" class="alert alert-success" style="display: none; margin-top: 20px; flex-direction: column; align-items: flex-start; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.2rem;">✅</span>
+          <strong id="trainResultTitle">Model Trained Successfully!</strong>
+        </div>
+        <p id="trainResultMessage" style="font-size: 0.9rem; color: var(--text-main); margin: 0;"></p>
+        <div style="margin-top: 10px; display: flex; gap: 10px;">
+          <a href="{{ url_for('recognize') }}" class="btn btn-success" style="font-size: 0.9rem;">
+            Test Recognition Now ➔
+          </a>
+          <a href="{{ url_for('dashboard') }}" class="btn btn-secondary" style="font-size: 0.9rem;">
+            Dashboard
+          </a>
+        </div>
+      </div>
+
+      <!-- Error Alert -->
+      <div id="trainErrorAlert" class="alert alert-danger" style="display: none; margin-top: 20px;">
+        <span>❌</span>
+        <div id="trainErrorText">An error occurred during training.</div>
+      </div>
+    </div>
+
+    <!-- How LBPH Training Works -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">ℹ️ How Training Works</h2>
+      </div>
+      <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.6;">
+        The LBPH (Local Binary Patterns Histograms) algorithm reads all 200 × 200 grayscale faces from the <code>faces/</code> directory. It analyzes local micro-texture patterns (edges, spots, flat areas) around each pixel and constructs a spatial histogram representing each person's facial geometry.
+      </p>
+      <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; margin-top: 10px;">
+        The trained weights are persisted to <code>models/face_model.yml</code>, and integer labels are written to <code>models/labels.json</code>. The model remains resident in memory for zero-latency live recognition.
+      </p>
+    </div>
+  </div>
+
+  <!-- Right Column: Training Dataset Pre-Flight -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Dataset Pre-Flight Check</h2>
+      <span id="datasetTotalBadge" class="badge badge-info">-- images</span>
+    </div>
+    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;">
+      The following registered users and face samples will be compiled into the model:
+    </p>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Sample Count</th>
+          <th>Quality Status</th>
+        </tr>
+      </thead>
+      <tbody id="preflightTableBody">
+        <tr>
+          <td colspan="3" style="text-align: center; color: var(--text-muted);">Loading dataset details...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const trainBtn = document.getElementById('trainBtn');
+  const trainBtnIcon = document.getElementById('trainBtnIcon');
+  const trainBtnText = document.getElementById('trainBtnText');
+  const modelStatusBadge = document.getElementById('modelStatusBadge');
+  const trainedUsersCount = document.getElementById('trainedUsersCount');
+  const lastTrainedTime = document.getElementById('lastTrainedTime');
+  const retrainAlertBanner = document.getElementById('retrainAlertBanner');
+  const datasetTotalBadge = document.getElementById('datasetTotalBadge');
+  const preflightTableBody = document.getElementById('preflightTableBody');
+  const trainResultAlert = document.getElementById('trainResultAlert');
+  const trainResultMessage = document.getElementById('trainResultMessage');
+  const trainErrorAlert = document.getElementById('trainErrorAlert');
+  const trainErrorText = document.getElementById('trainErrorText');
+
+  function formatDate(timestamp) {
+    if (!timestamp) return 'Never';
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleString();
+  }
+
+  async function loadTrainingData() {
+    try {
+      const statsRes = await fetch('/api/stats');
+      const stats = await statsRes.json();
+
+      datasetTotalBadge.textContent = `${stats.total_images} total images`;
+      trainedUsersCount.textContent = `${stats.registered_labels.length} users`;
+      lastTrainedTime.textContent = formatDate(stats.last_trained_time);
+
+      if (stats.model_active) {
+        modelStatusBadge.innerHTML = '<span class="badge badge-success">Loaded & Active</span>';
+      } else if (stats.model_exists) {
+        modelStatusBadge.innerHTML = '<span class="badge badge-warning">Available on Disk</span>';
+      } else {
+        modelStatusBadge.innerHTML = '<span class="badge badge-danger">Not Trained</span>';
+      }
+
+      retrainAlertBanner.style.display = stats.model_needs_retrain ? 'flex' : 'none';
+
+      // Load users table
+      const usersRes = await fetch('/api/users');
+      const usersData = await usersRes.json();
+
+      if (!usersData.users || usersData.users.length === 0) {
+        preflightTableBody.innerHTML = `
+          <tr>
+            <td colspan="3" style="text-align: center; color: var(--accent-danger);">
+              No registered face images found. <a href="/register" style="color:#60a5fa; text-decoration:underline;">Register a face</a> first.
+            </td>
+          </tr>`;
+        trainBtn.disabled = true;
+        return;
+      }
+
+      trainBtn.disabled = false;
+      preflightTableBody.innerHTML = usersData.users.map(u => {
+        let badge = '<span class="badge badge-success">Optimal (50 imgs)</span>';
+        if (u.image_count === 0) {
+          badge = '<span class="badge badge-danger">No images</span>';
+        } else if (u.image_count < 30) {
+          badge = `<span class="badge badge-warning">Low count (${u.image_count})</span>`;
+        } else if (u.image_count < 50) {
+          badge = `<span class="badge badge-info">Good (${u.image_count})</span>`;
+        }
+
+        return `
+          <tr>
+            <td style="font-weight: 600;">👤 ${u.name}</td>
+            <td>${u.image_count} images</td>
+            <td>${badge}</td>
+          </tr>
+        `;
+      }).join('');
+    } catch (err) {
+      console.error('Failed to load training info:', err);
+    }
+  }
+
+  // Trigger Model Training
+  trainBtn.addEventListener('click', async () => {
+    trainBtn.disabled = true;
+    trainBtnIcon.innerHTML = '<span class="spinner"></span>';
+    trainBtnText.textContent = 'Training Model, Please Wait...';
+    trainResultAlert.style.display = 'none';
+    trainErrorAlert.style.display = 'none';
+
+    try {
+      const response = await fetch('/api/train', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        trainResultMessage.innerHTML = `
+          Successfully trained LBPH model on <strong>${result.user_count} user(s)</strong> across <strong>${result.image_count} face images</strong>.<br>
+          Registered labels: ${result.users.map(u => `<code>${u}</code>`).join(', ')}.
+        `;
+        trainResultAlert.style.display = 'flex';
+        await loadTrainingData();
+      } else {
+        trainErrorText.textContent = result.error || 'Failed to train model.';
+        trainErrorAlert.style.display = 'flex';
+      }
+    } catch (err) {
+      console.error('Training error:', err);
+      trainErrorText.textContent = 'Network or server error during model training.';
+      trainErrorAlert.style.display = 'flex';
+    } finally {
+      trainBtn.disabled = false;
+      trainBtnIcon.textContent = '🧠';
+      trainBtnText.textContent = 'Re-train Model';
+    }
+  });
+
+  // Initial load
+  loadTrainingData();
+</script>
+{% endblock %}
+

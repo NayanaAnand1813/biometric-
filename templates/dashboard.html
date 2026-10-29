@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Face Recognition System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Biometric Dashboard</h1>
+    <p class="page-desc">System overview, dataset statistics, and quick actions.</p>
+  </div>
+  <button id="refreshStatsBtn" class="btn btn-secondary">
+    <span>🔄</span> Refresh Stats
+  </button>
+</div>
+
+<!-- Key Stat Cards -->
+<div class="grid-4">
+  <div class="card stat-card">
+    <div class="stat-icon blue">👥</div>
+    <div>
+      <div id="statUserCount" class="stat-value">--</div>
+      <div class="stat-label">Registered Users</div>
+    </div>
+  </div>
+
+  <div class="card stat-card">
+    <div class="stat-icon purple">🖼️</div>
+    <div>
+      <div id="statImageCount" class="stat-value">--</div>
+      <div class="stat-label">Stored Face Images</div>
+    </div>
+  </div>
+
+  <div class="card stat-card">
+    <div class="stat-icon green">🧠</div>
+    <div>
+      <div id="statModelStatus" class="stat-value" style="font-size: 1.25rem;">Checking...</div>
+      <div class="stat-label">Model Status</div>
+    </div>
+  </div>
+
+  <div class="card stat-card">
+    <div class="stat-icon amber">⚙️</div>
+    <div>
+      <div id="statThreshold" class="stat-value">< 80</div>
+      <div class="stat-label">LBPH Threshold</div>
+    </div>
+  </div>
+</div>
+
+<!-- Alert Banner if retraining is recommended -->
+<div id="retrainAlert" class="alert alert-warning" style="display: none;">
+  <span>⚠️</span>
+  <div>
+    <strong>Model Retraining Recommended:</strong> Face images or users have been modified since the last model training.
+    <a href="{{ url_for('train') }}" style="color: #fbbf24; text-decoration: underline; margin-left: 8px;">Train Model Now</a>
+  </div>
+</div>
+
+<!-- Quick Action Cards -->
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">🚀 Quick Actions</h2>
+    </div>
+    <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">
+      Perform key face recognition tasks directly from the dashboard:
+    </p>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <a href="{{ url_for('register') }}" class="btn btn-primary" style="justify-content: flex-start;">
+        <span style="font-size: 1.2rem;">➕</span>
+        <span>Register New Face (Webcam Capture)</span>
+      </a>
+      <a href="{{ url_for('train') }}" class="btn btn-secondary" style="justify-content: flex-start;">
+        <span style="font-size: 1.2rem;">🧠</span>
+        <span>Train Recognition Model (LBPH)</span>
+      </a>
+      <a href="{{ url_for('recognize') }}" class="btn btn-success" style="justify-content: flex-start;">
+        <span style="font-size: 1.2rem;">🎯</span>
+        <span>Launch Real-Time Live Recognition</span>
+      </a>
+      <a href="{{ url_for('users') }}" class="btn btn-secondary" style="justify-content: flex-start;">
+        <span style="font-size: 1.2rem;">👥</span>
+        <span>Manage Registered Users & Datasets</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Architecture & Settings Info -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">🔍 Pipeline & Calibration</h2>
+    </div>
+    <ul style="list-style: none; display: flex; flex-direction: column; gap: 14px; font-size: 0.9rem;">
+      <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <span style="color: var(--text-muted);">Face Detector:</span>
+        <strong>Haar Cascade (Frontal Default)</strong>
+      </li>
+      <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <span style="color: var(--text-muted);">Classifier Algorithm:</span>
+        <strong>LBPH (Local Binary Patterns Histograms)</strong>
+      </li>
+      <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <span style="color: var(--text-muted);">Image Preprocessing:</span>
+        <strong>200 × 200 Grayscale (Normalized)</strong>
+      </li>
+      <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <span style="color: var(--text-muted);">Target Image Count:</span>
+        <strong>50 images per person</strong>
+      </li>
+      <li style="display: flex; justify-content: space-between;">
+        <span style="color: var(--text-muted);">Confidence Metric:</span>
+        <span style="color: #60a5fa; font-weight: 600;">Distance (Lower is closer match)</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<!-- Registered Users Quick Preview -->
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">Registered Dataset Overview</h2>
+    <a href="{{ url_for('users') }}" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;">View All Users</a>
+  </div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>User Name</th>
+        <th>Dataset Samples</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="usersTableBody">
+      <tr>
+        <td colspan="3" style="text-align: center; color: var(--text-muted);">Loading user records...</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function loadDashboardStats() {
+    try {
+      const response = await fetch('/api/stats');
+      const data = await response.json();
+
+      document.getElementById('statUserCount').textContent = data.user_count;
+      document.getElementById('statImageCount').textContent = data.total_images;
+      document.getElementById('statThreshold').textContent = `< ${data.default_threshold}`;
+
+      const statusEl = document.getElementById('statModelStatus');
+      const alertEl = document.getElementById('retrainAlert');
+
+      if (data.model_active) {
+        statusEl.innerHTML = '<span class="badge badge-success">Active & Loaded</span>';
+      } else if (data.model_exists) {
+        statusEl.innerHTML = '<span class="badge badge-warning">Available on Disk</span>';
+      } else {
+        statusEl.innerHTML = '<span class="badge badge-danger">Not Trained</span>';
+      }
+
+      if (data.model_needs_retrain) {
+        alertEl.style.display = 'flex';
+      } else {
+        alertEl.style.display = 'none';
+      }
+    } catch (err) {
+      console.error('Failed to load stats:', err);
+    }
+  }
+
+  async function loadUsersPreview() {
+    const tbody = document.getElementById('usersTableBody');
+    try {
+      const response = await fetch('/api/users');
+      const data = await response.json();
+
+      if (!data.users || data.users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No registered users yet. Click "Register Face" to get started.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.users.map(u => `
+        <tr>
+          <td style="font-weight: 600;">👤 ${u.name}</td>
+          <td><span class="badge badge-info">${u.image_count} / 50 images</span></td>
+          <td>
+            ${u.image_count >= 50 
+              ? '<span class="badge badge-success">Complete</span>' 
+              : '<span class="badge badge-warning">Partial</span>'}
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--accent-danger);">Failed to load users list.</td></tr>';
+    }
+  }
+
+  document.getElementById('refreshStatsBtn').addEventListener('click', () => {
+    loadDashboardStats();
+    loadUsersPreview();
+  });
+
+  // Initial load
+  loadDashboardStats();
+  loadUsersPreview();
+</script>
+{% endblock %}
+

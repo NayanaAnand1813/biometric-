@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Registered Users - Face Recognition System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Registered Biometric Users</h1>
+    <p class="page-desc">Manage existing face registrations, sample counts, and dataset records.</p>
+  </div>
+  <div style="display: flex; gap: 10px;">
+    <button id="refreshUsersBtn" class="btn btn-secondary">
+      <span>🔄</span> Refresh List
+    </button>
+    <a href="{{ url_for('register') }}" class="btn btn-primary">
+      <span>➕</span> Register New User
+    </a>
+  </div>
+</div>
+
+<!-- Alert Banner if retraining is needed -->
+<div id="usersRetrainAlert" class="alert alert-warning" style="display: none;">
+  <span>⚠️</span>
+  <div>
+    <strong>Model Retraining Recommended:</strong> A user's face data was modified or removed.
+    <a href="{{ url_for('train') }}" style="color: #fbbf24; text-decoration: underline; margin-left: 8px;">Retrain Model Now</a>
+  </div>
+</div>
+
+<!-- Notification Toast/Alert -->
+<div id="userActionAlert" class="alert alert-success" style="display: none;">
+  <span id="userActionIcon">✅</span>
+  <span id="userActionText">Action completed successfully.</span>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">Stored Face Datasets (faces/ directory)</h2>
+    <span id="totalUserCountBadge" class="badge badge-info">-- Users Registered</span>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>User Name</th>
+        <th>Face Samples</th>
+        <th>Data Status</th>
+        <th style="text-align: right;">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="registeredUsersTbody">
+      <tr>
+        <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 24px;">Loading registered users...</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const tbody = document.getElementById('registeredUsersTbody');
+  const countBadge = document.getElementById('totalUserCountBadge');
+  const refreshBtn = document.getElementById('refreshUsersBtn');
+  const retrainAlert = document.getElementById('usersRetrainAlert');
+  const actionAlert = document.getElementById('userActionAlert');
+  const actionText = document.getElementById('userActionText');
+
+  function showActionAlert(message, type = 'success', icon = '✅') {
+    actionAlert.className = `alert alert-${type}`;
+    document.getElementById('userActionIcon').textContent = icon;
+    actionText.textContent = message;
+    actionAlert.style.display = 'flex';
+    setTimeout(() => { actionAlert.style.display = 'none'; }, 6000);
+  }
+
+  async function loadUsers() {
+    try {
+      const [usersRes, statsRes] = await Promise.all([
+        fetch('/api/users'),
+        fetch('/api/stats')
+      ]);
+
+      const usersData = await usersRes.json();
+      const stats = await statsRes.json();
+
+      retrainAlert.style.display = stats.model_needs_retrain ? 'flex' : 'none';
+      countBadge.textContent = `${usersData.users.length} Users Registered (${stats.total_images} Total Samples)`;
+
+      if (!usersData.users || usersData.users.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 32px;">
+              No registered users found in the <code>faces/</code> directory.<br>
+              <a href="/register" class="btn btn-primary" style="margin-top: 14px;">Register Your First Face</a>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = usersData.users.map(u => `
+        <tr>
+          <td>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(59, 130, 246, 0.2); display: flex; align-items: center; justify-content: center; font-size: 18px;">
+                👤
+              </div>
+              <strong style="font-size: 1rem;">${u.name}</strong>
+            </div>
+          </td>
+          <td>
+            <span class="badge badge-info">${u.image_count} / 50 samples</span>
+          </td>
+          <td>
+            ${u.image_count >= 50 
+              ? '<span class="badge badge-success">Complete (200x200)</span>' 
+              : '<span class="badge badge-warning">Partial Dataset</span>'}
+          </td>
+          <td style="text-align: right;">
+            <button class="btn btn-danger" style="padding: 6px 12px; font-size: 0.85rem;" onclick="confirmDeleteUser('${u.name}')">
+              <span>🗑️</span> Delete
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      console.error('Failed to load users:', err);
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-danger);">Error loading users list.</td></tr>';
+    }
+  }
+
+  async function confirmDeleteUser(userName) {
+    const confirmed = confirm(
+      `Are you sure you want to delete all registered face images for "${userName}"?\n\nThis will remove the user folder from faces/ and you will need to retrain the recognition model.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(userName)}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        showActionAlert(result.message, 'success', '🗑️');
+        await loadUsers();
+      } else {
+        showActionAlert(result.error || 'Failed to delete user.', 'danger', '❌');
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      showActionAlert('Network error while deleting user.', 'danger', '❌');
+    }
+  }
+
+  refreshBtn.addEventListener('click', loadUsers);
+  loadUsers();
+</script>
+{% endblock %}
+

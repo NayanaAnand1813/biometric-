@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Register Face - Face Recognition System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Register New Face</h1>
+    <p class="page-desc">Capture 50 biometric face samples using your browser webcam.</p>
+  </div>
+  <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+
+<div class="grid-2">
+  <!-- Left Column: Camera Viewport -->
+  <div class="card" style="display: flex; flex-direction: column; align-items: center;">
+    <div class="camera-stage">
+      <div id="cameraPlaceholder" class="camera-placeholder">
+        <div class="camera-placeholder-icon">📷</div>
+        <p>Camera is currently inactive.</p>
+        <p style="font-size: 0.8rem;">Click <strong>Start Camera</strong> to allow browser webcam access.</p>
+      </div>
+      <video id="webcamVideo" class="camera-video" autoplay playsinline muted style="display: none;"></video>
+      <canvas id="overlayCanvas" class="overlay-canvas"></canvas>
+      <canvas id="captureCanvas" style="display: none;"></canvas>
+    </div>
+
+    <!-- Live Feedback Notification -->
+    <div id="statusAlert" class="alert alert-info" style="width: 100%; max-width: 640px;">
+      <span id="statusIcon">ℹ️</span>
+      <span id="statusText">Enter user's name below and start the camera.</span>
+    </div>
+
+    <!-- Progress Tracker -->
+    <div style="width: 100%; max-width: 640px;">
+      <div style="display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 600;">
+        <span>Capture Progress:</span>
+        <span id="progressCountText">0 / 50 images</span>
+      </div>
+      <div class="progress-container">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Registration Controls & Guidelines -->
+  <div style="display: flex; flex-direction: column; gap: 24px;">
+    <!-- Form Controls -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Registration Controls</h2>
+      </div>
+
+      <div class="form-group">
+        <label for="personNameInput" class="form-label">Person's Full Name:</label>
+        <input 
+          type="text" 
+          id="personNameInput" 
+          class="form-control" 
+          placeholder="e.g. John Doe, Alice_Smith" 
+          maxlength="50"
+          autocomplete="off"
+        >
+        <p class="form-help">Only letters, numbers, spaces, underscores, and hyphens.</p>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; gap: 10px;">
+          <button id="startCamBtn" class="btn btn-primary" style="flex: 1;">
+            <span>📷</span> Start Camera
+          </button>
+          <button id="stopCamBtn" class="btn btn-secondary" style="flex: 1;" disabled>
+            <span>⏹️</span> Stop Camera
+          </button>
+        </div>
+
+        <button id="startCaptureBtn" class="btn btn-success" style="width: 100%; padding: 12px;" disabled>
+          <span>⚡</span> Start Auto-Capture (50 Images)
+        </button>
+
+        <button id="stopCaptureBtn" class="btn btn-danger" style="width: 100%; display: none;">
+          <span>🛑</span> Stop Capturing
+        </button>
+      </div>
+
+      <!-- Success Call-To-Action after completion -->
+      <div id="completionBanner" class="alert alert-success" style="display: none; margin-top: 20px; flex-direction: column; align-items: flex-start; gap: 10px;">
+        <div>
+          <strong>🎉 Registration Complete!</strong>
+          <p style="font-size: 0.85rem; margin-top: 4px;">50 face samples have been saved in 200×200 grayscale format. To recognize this person, retrain the model.</p>
+        </div>
+        <a href="{{ url_for('train') }}" class="btn btn-primary" style="align-self: flex-start; font-size: 0.9rem;">
+          Go to Model Training ➔
+        </a>
+      </div>
+    </div>
+
+    <!-- Best Practices Card -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">💡 Capture Guidelines</h2>
+      </div>
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem; color: var(--text-muted);">
+        <li>✓ <strong>Position:</strong> Keep face centered within the camera viewport.</li>
+        <li>✓ <strong>Lighting:</strong> Ensure even lighting across the face without harsh shadows or backlighting.</li>
+        <li>✓ <strong>Motion:</strong> Move your head gently (nod slightly, turn left/right slowly) to capture different angles.</li>
+        <li>✓ <strong>Obstructions:</strong> Remove sunglasses or hats if they obscure eyes and facial contours.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/register.js') }}"></script>
+{% endblock %}
+

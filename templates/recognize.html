@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Live Recognition & Login - Face Recognition System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Live Face Recognition & Login</h1>
+    <p class="page-desc">Real-time biometric facial recognition and authentication using OpenCV LBPH.</p>
+  </div>
+  <div style="display: flex; gap: 10px;">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Home Portal</a>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Dashboard</a>
+  </div>
+</div>
+
+<!-- Alert if Model is not trained -->
+<div id="unloadedModelAlert" class="alert alert-danger" style="display: none;">
+  <span>❌</span>
+  <div>
+    <strong>Recognition Model Not Ready:</strong> Please train the model with registered face samples before running recognition.
+    <a href="{{ url_for('train') }}" style="color: #f87171; text-decoration: underline; margin-left: 8px;">Train Model Now</a>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- Left Column: Camera Viewport with Overlay -->
+  <div class="card" style="display: flex; flex-direction: column; align-items: center;">
+    <div class="camera-stage">
+      <div id="cameraPlaceholder" class="camera-placeholder">
+        <div class="camera-placeholder-icon">🎯</div>
+        <p>Recognition camera is currently off.</p>
+        <p style="font-size: 0.8rem;">Click <strong>Start Recognition</strong> to activate webcam.</p>
+      </div>
+      <video id="webcamVideo" class="camera-video" autoplay playsinline muted style="display: none;"></video>
+      <canvas id="overlayCanvas" class="overlay-canvas"></canvas>
+      <canvas id="captureCanvas" style="display: none;"></canvas>
+    </div>
+
+    <!-- Recognition Feedback Card -->
+    <div id="loginFeedbackCard" class="card" style="width: 100%; max-width: 640px; padding: 18px; margin-top: 10px; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <div id="matchStatusIcon" style="font-size: 32px;">👤</div>
+        <div>
+          <div id="matchName" style="font-size: 1.25rem; font-weight: 700;">Camera Inactive</div>
+          <div id="matchSubtext" style="font-size: 0.85rem; color: var(--text-muted);">Start the camera to begin identity verification</div>
+        </div>
+      </div>
+      <div id="matchBadgeContainer">
+        <span class="badge badge-info">Idle</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Recognition Controls & Live Diagnostics -->
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+    <!-- Controls Card -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Recognition Controls</h2>
+      </div>
+
+      <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+        <button id="startRecBtn" class="btn btn-success" style="flex: 1; padding: 14px; font-size: 1rem;">
+          <span>▶️</span> Start Recognition
+        </button>
+        <button id="stopRecBtn" class="btn btn-secondary" style="flex: 1; padding: 14px; font-size: 1rem;" disabled>
+          <span>⏹️</span> Stop Camera
+        </button>
+      </div>
+
+      <!-- Threshold Calibration Slider -->
+      <div class="form-group" style="background: rgba(0, 0, 0, 0.2); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <label for="thresholdSlider" class="form-label" style="margin: 0;">LBPH Distance Threshold:</label>
+          <span id="thresholdValueText" class="badge badge-info" style="font-size: 0.95rem;">80.0</span>
+        </div>
+        <input 
+          type="range" 
+          id="thresholdSlider" 
+          min="40" 
+          max="120" 
+          step="5" 
+          value="80" 
+          style="width: 100%; cursor: pointer;"
+        >
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">
+          <span>Stricter Match (40)</span>
+          <span>Default (80)</span>
+          <span>More Tolerant (120)</span>
+        </div>
+        <p class="form-help" style="margin-top: 10px; line-height: 1.5;">
+          <strong>Understanding LBPH Confidence:</strong> In OpenCV LBPH, confidence represents spatial histogram distance. 
+          A <em>lower</em> number indicates a closer biometric match (0 is identical). If confidence is below the threshold, the identity is accepted.
+        </p>
+      </div>
+    </div>
+
+    <!-- Live Diagnostics Card -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Live Diagnostics</h2>
+      </div>
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: 12px; font-size: 0.9rem;">
+        <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+          <span style="color: var(--text-muted);">Inference Rate:</span>
+          <strong id="fpsCounter">~5 fps (200ms)</strong>
+        </li>
+        <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+          <span style="color: var(--text-muted);">Detected Faces:</span>
+          <strong id="diagFaceCount">0</strong>
+        </li>
+        <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+          <span style="color: var(--text-muted);">Last Distance Score:</span>
+          <strong id="diagScore">--</strong>
+        </li>
+        <li style="display: flex; justify-content: space-between;">
+          <span style="color: var(--text-muted);">Registered Users in Memory:</span>
+          <strong id="diagRegisteredCount">--</strong>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/recognize.js') }}"></script>
+{% endblock %}
+

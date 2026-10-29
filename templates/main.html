@@ -1,0 +1,470 @@
+{% extends "base.html" %}
+
+{% block title %}Face Recognition Portal{% endblock %}
+
+{% block content %}
+<div style="max-width: 820px; margin: 0 auto;">
+
+  <!-- Header -->
+  <div style="text-align: center; margin-bottom: 24px;">
+    <h1 style="font-size: 2.2rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 6px;">
+      Biometric Face Recognition
+    </h1>
+    <p style="color: var(--text-muted); font-size: 0.95rem;">
+      Pure facial biometric authentication — no email or password required.
+    </p>
+  </div>
+
+  <!-- The 2 Primary Action Buttons -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+    <button id="modeLoginBtn" class="btn btn-success" style="padding: 16px 20px; font-size: 1.15rem; border-radius: 12px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);">
+      <span style="font-size: 1.4rem;">🔓</span>
+      <span>Login with Face</span>
+    </button>
+
+    <button id="modeRegisterBtn" class="btn btn-primary" style="padding: 16px 20px; font-size: 1.15rem; border-radius: 12px; opacity: 0.75;">
+      <span style="font-size: 1.4rem;">➕</span>
+      <span>Register New Face</span>
+    </button>
+  </div>
+
+  <!-- Central Camera Stage -->
+  <div class="card" style="padding: 20px; display: flex; flex-direction: column; align-items: center;">
+    <div class="camera-stage" style="margin-bottom: 16px; max-width: 600px;">
+      <div id="camPlaceholder" class="camera-placeholder">
+        <div class="camera-placeholder-icon">📷</div>
+        <p style="font-weight: 600; font-size: 1.05rem;">Camera is Offline</p>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+          Click either <strong>Login with Face</strong> or <strong>Register New Face</strong> to activate.
+        </p>
+      </div>
+      <video id="webcam" class="camera-video" autoplay playsinline muted style="display: none;"></video>
+      <canvas id="overlay" class="overlay-canvas"></canvas>
+      <canvas id="hiddenCanvas" style="display: none;"></canvas>
+    </div>
+
+    <!-- Live Status / Verification Alert -->
+    <div id="statusBanner" class="alert alert-info" style="width: 100%; max-width: 600px; margin-bottom: 0; justify-content: center; font-size: 1.05rem; font-weight: 600;">
+      <span id="statusIcon">ℹ️</span>
+      <span id="statusMessage">Select "Login with Face" or "Register New Face" to start.</span>
+    </div>
+
+    <!-- Registration Panel (Only shown when "Register New Face" is active) -->
+    <div id="registerPanel" style="display: none; width: 100%; max-width: 600px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border-color);">
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label for="regNameInput" class="form-label">Person's Name:</label>
+        <input 
+          type="text" 
+          id="regNameInput" 
+          class="form-control" 
+          placeholder="Enter person's name (e.g. Nayana, Raj)" 
+          maxlength="40"
+          autocomplete="off"
+        >
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <button id="startCaptureActionBtn" class="btn btn-primary" style="flex: 1; padding: 12px; font-size: 1rem;">
+          <span>📸</span> Capture & Register (50 Samples)
+        </button>
+        <button id="stopCaptureActionBtn" class="btn btn-danger" style="display: none; flex: 1; padding: 12px;">
+          <span>⏹️</span> Stop Capturing
+        </button>
+      </div>
+
+      <!-- Registration Progress Bar -->
+      <div id="regProgressContainer" style="display: none; margin-top: 14px;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px;">
+          <span>Capturing Samples:</span>
+          <span id="regProgressCount">0 / 50</span>
+        </div>
+        <div class="progress-container" style="margin: 0;">
+          <div id="regProgressBar" class="progress-bar"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Bar: Registered Users & Threshold Slider -->
+  <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+    <!-- Registered Users Overview -->
+    <div class="card" style="padding: 16px 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <strong style="font-size: 0.95rem;">👥 Registered Users</strong>
+        <span id="usersCountBadge" class="badge badge-info">-- Users</span>
+      </div>
+      <div id="usersPillContainer" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Loading database...</span>
+      </div>
+    </div>
+
+    <!-- Threshold Adjustment -->
+    <div class="card" style="padding: 16px 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <strong style="font-size: 0.95rem;">⚙️ Match Sensitivity (LBPH)</strong>
+        <span id="thresholdValBadge" class="badge badge-info">80.0</span>
+      </div>
+      <input type="range" id="thresholdSlider" min="45" max="115" step="5" value="80" style="width: 100%; cursor: pointer;">
+      <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+        <span>Stricter (45)</span>
+        <span>Default (80)</span>
+        <span>Tolerant (115)</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  // DOM Elements
+  const modeLoginBtn = document.getElementById('modeLoginBtn');
+  const modeRegisterBtn = document.getElementById('modeRegisterBtn');
+  const webcam = document.getElementById('webcam');
+  const overlay = document.getElementById('overlay');
+  const hiddenCanvas = document.getElementById('hiddenCanvas');
+  const camPlaceholder = document.getElementById('camPlaceholder');
+  const statusBanner = document.getElementById('statusBanner');
+  const statusIcon = document.getElementById('statusIcon');
+  const statusMessage = document.getElementById('statusMessage');
+
+  // Register Panel Elements
+  const registerPanel = document.getElementById('registerPanel');
+  const regNameInput = document.getElementById('regNameInput');
+  const startCaptureActionBtn = document.getElementById('startCaptureActionBtn');
+  const stopCaptureActionBtn = document.getElementById('stopCaptureActionBtn');
+  const regProgressContainer = document.getElementById('regProgressContainer');
+  const regProgressBar = document.getElementById('regProgressBar');
+  const regProgressCount = document.getElementById('regProgressCount');
+
+  // Bottom stats & slider
+  const usersCountBadge = document.getElementById('usersCountBadge');
+  const usersPillContainer = document.getElementById('usersPillContainer');
+  const thresholdSlider = document.getElementById('thresholdSlider');
+  const thresholdValBadge = document.getElementById('thresholdValBadge');
+
+  const overlayCtx = overlay.getContext('2d');
+  const hiddenCtx = hiddenCanvas.getContext('2d');
+
+  let mediaStream = null;
+  let currentMode = 'login'; // 'login' or 'register'
+  let isLoopRunning = false;
+  let isRequestPending = false;
+  let loopTimeoutId = null;
+  let isCapturing = false;
+
+  // Update threshold text
+  thresholdSlider.addEventListener('input', () => {
+    thresholdValBadge.textContent = parseFloat(thresholdSlider.value).toFixed(1);
+  });
+
+  function setStatus(msg, type = 'info', icon = 'ℹ️') {
+    statusBanner.className = `alert alert-${type}`;
+    statusIcon.textContent = icon;
+    statusMessage.textContent = msg;
+  }
+
+  // Load registered users
+  async function loadUsersList() {
+    try {
+      const res = await fetch('/api/users');
+      const data = await res.json();
+      usersCountBadge.textContent = `${data.users.length} Users`;
+
+      if (!data.users || data.users.length === 0) {
+        usersPillContainer.innerHTML = '<span style="font-size:0.85rem; color:var(--text-muted);">No registered users yet. Click "Register New Face".</span>';
+        return;
+      }
+
+      usersPillContainer.innerHTML = data.users.map(u => `
+        <span class="badge badge-success" style="padding: 4px 8px; font-size: 0.85rem;">
+          👤 ${u.name} (${u.image_count})
+        </span>
+      `).join('');
+    } catch (e) {
+      console.error('Failed to load users:', e);
+    }
+  }
+
+  // 1. Initialize Camera
+  async function ensureCamera() {
+    if (mediaStream) return true;
+
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+        audio: false,
+      });
+
+      webcam.srcObject = mediaStream;
+      webcam.style.display = 'block';
+      camPlaceholder.style.display = 'none';
+
+      webcam.onloadedmetadata = () => {
+        overlay.width = webcam.videoWidth || 640;
+        overlay.height = webcam.videoHeight || 480;
+        hiddenCanvas.width = webcam.videoWidth || 640;
+        hiddenCanvas.height = webcam.videoHeight || 480;
+      };
+
+      return true;
+    } catch (err) {
+      console.error('Camera error:', err);
+      setStatus('Camera permission denied or camera not found. Please allow camera access.', 'danger', '❌');
+      return false;
+    }
+  }
+
+  function clearOverlay() {
+    overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+  }
+
+  // 2. Mode Switching
+  async function switchMode(mode) {
+    currentMode = mode;
+
+    if (mode === 'login') {
+      modeLoginBtn.style.opacity = '1';
+      modeLoginBtn.style.boxShadow = '0 4px 14px rgba(16, 185, 129, 0.4)';
+      modeRegisterBtn.style.opacity = '0.7';
+      modeRegisterBtn.style.boxShadow = 'none';
+      registerPanel.style.display = 'none';
+
+      const ok = await ensureCamera();
+      if (ok) {
+        setStatus('Looking for registered face... Align with camera.', 'info', '🔍');
+        startLoginLoop();
+      }
+    } else {
+      // Register Mode
+      modeRegisterBtn.style.opacity = '1';
+      modeRegisterBtn.style.boxShadow = '0 4px 14px rgba(59, 130, 246, 0.4)';
+      modeLoginBtn.style.opacity = '0.7';
+      modeLoginBtn.style.boxShadow = 'none';
+      registerPanel.style.display = 'block';
+
+      stopLoginLoop();
+      clearOverlay();
+      const ok = await ensureCamera();
+      if (ok) {
+        setStatus('Enter the person\'s name below, then click "Capture & Register".', 'info', '➕');
+      }
+    }
+  }
+
+  modeLoginBtn.addEventListener('click', () => switchMode('login'));
+  modeRegisterBtn.addEventListener('click', () => switchMode('register'));
+
+  // 3. Login Face Recognition Loop
+  function startLoginLoop() {
+    isLoopRunning = true;
+    runLoginStep();
+  }
+
+  function stopLoginLoop() {
+    isLoopRunning = false;
+    if (loopTimeoutId) {
+      clearTimeout(loopTimeoutId);
+      loopTimeoutId = null;
+    }
+    clearOverlay();
+  }
+
+  async function runLoginStep() {
+    if (!isLoopRunning || currentMode !== 'login' || !mediaStream) return;
+
+    if (!isRequestPending && webcam.readyState >= 2) {
+      isRequestPending = true;
+
+      hiddenCtx.drawImage(webcam, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+      const frameData = hiddenCanvas.toDataURL('image/jpeg', 0.8);
+      const threshold = parseFloat(thresholdSlider.value) || 80.0;
+
+      try {
+        const response = await fetch('/api/recognize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: frameData, threshold: threshold }),
+        });
+
+        const result = await response.json();
+
+        if (result.success && currentMode === 'login') {
+          renderLoginBoxes(result.faces);
+
+          if (result.faces && result.faces.length > 0) {
+            const primary = result.faces[0];
+            if (primary.matched) {
+              setStatus(`Login Successful! Welcome, ${primary.name}! (Score: ${primary.confidence})`, 'success', '🔓');
+            } else {
+              setStatus(`Access Denied: Unrecognized Face (Score: ${primary.confidence} ≥ ${threshold})`, 'danger', '🚫');
+            }
+          } else {
+            setStatus('Scanning... Please face the camera.', 'info', '🔍');
+          }
+        }
+      } catch (err) {
+        console.error('Recognition error:', err);
+      } finally {
+        isRequestPending = false;
+      }
+    }
+
+    if (isLoopRunning && currentMode === 'login') {
+      loopTimeoutId = setTimeout(runLoginStep, 190);
+    }
+  }
+
+  function renderLoginBoxes(faces) {
+    clearOverlay();
+    if (!faces || faces.length === 0) return;
+
+    const scaleX = overlay.width / (hiddenCanvas.width || 640);
+    const scaleY = overlay.height / (hiddenCanvas.height || 480);
+
+    faces.forEach((face) => {
+      const [x, y, w, h] = face.box;
+      const rx = x * scaleX;
+      const ry = y * scaleY;
+      const rw = w * scaleX;
+      const rh = h * scaleY;
+
+      const isMatch = face.matched;
+      const color = isMatch ? '#10b981' : '#ef4444';
+      const label = isMatch ? `${face.name} (${face.confidence})` : `Unknown (${face.confidence})`;
+
+      overlayCtx.lineWidth = 3;
+      overlayCtx.strokeStyle = color;
+      overlayCtx.strokeRect(rx, ry, rw, rh);
+
+      overlayCtx.font = 'bold 15px sans-serif';
+      const textWidth = overlayCtx.measureText(label).width;
+      const tagY = ry > 30 ? ry - 28 : ry + rh + 4;
+
+      overlayCtx.fillStyle = color;
+      overlayCtx.fillRect(rx, tagY, textWidth + 14, 24);
+
+      overlayCtx.fillStyle = '#ffffff';
+      overlayCtx.fillText(label, rx + 7, tagY + 17);
+    });
+  }
+
+  // 4. Registration Flow
+  startCaptureActionBtn.addEventListener('click', async () => {
+    const name = regNameInput.value.trim();
+    if (!name) {
+      setStatus('Please enter the person\'s name before capturing.', 'warning', '⚠️');
+      regNameInput.focus();
+      return;
+    }
+
+    const ok = await ensureCamera();
+    if (!ok) return;
+
+    isCapturing = true;
+    startCaptureActionBtn.style.display = 'none';
+    stopCaptureActionBtn.style.display = 'block';
+    regNameInput.disabled = true;
+    regProgressContainer.style.display = 'block';
+    regProgressBar.style.width = '0%';
+    regProgressCount.textContent = '0 / 50';
+
+    setStatus(`Capturing 50 samples for "${name}". Move head slightly...`, 'info', '📸');
+    captureNextRegistrationSample(name);
+  });
+
+  stopCaptureActionBtn.addEventListener('click', () => {
+    isCapturing = false;
+    startCaptureActionBtn.style.display = 'block';
+    stopCaptureActionBtn.style.display = 'none';
+    regNameInput.disabled = false;
+    clearOverlay();
+    setStatus('Capture paused by user.', 'info', '⏸️');
+  });
+
+  async function captureNextRegistrationSample(name) {
+    if (!isCapturing || !mediaStream) return;
+
+    hiddenCtx.drawImage(webcam, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+    const frameData = hiddenCanvas.toDataURL('image/jpeg', 0.85);
+
+    try {
+      const res = await fetch('/api/register_frame', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, image: frameData }),
+      });
+
+      const result = await res.json();
+
+      if (result.success) {
+        const percent = Math.min(100, Math.round((result.count / 50) * 100));
+        regProgressBar.style.width = `${percent}%`;
+        regProgressCount.textContent = `${result.count} / 50`;
+
+        if (result.box) {
+          drawRegistrationBox(result.box);
+        }
+
+        setStatus(`Capturing sample ${result.count}/50 for "${name}"...`, 'info', '📸');
+
+        if (result.completed || result.count >= 50) {
+          isCapturing = false;
+          startCaptureActionBtn.style.display = 'block';
+          stopCaptureActionBtn.style.display = 'none';
+          regNameInput.disabled = false;
+          regNameInput.value = '';
+          clearOverlay();
+
+          setStatus(`🎉 Registration & model update complete for "${name}"! Click "Login with Face" to authenticate.`, 'success', '✅');
+          await loadUsersList();
+          return;
+        }
+      } else {
+        if (result.error && result.error.includes('No face detected')) {
+          setStatus('No face detected. Keep face centered in light.', 'warning', '⚠️');
+        } else if (result.completed) {
+          isCapturing = false;
+          startCaptureActionBtn.style.display = 'block';
+          stopCaptureActionBtn.style.display = 'none';
+          regNameInput.disabled = false;
+          setStatus(`User "${name}" is already registered with 50 samples. Click "Login with Face".`, 'success', '✅');
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Frame upload error:', e);
+    }
+
+    if (isCapturing) {
+      setTimeout(() => captureNextRegistrationSample(name), 220);
+    }
+  }
+
+  function drawRegistrationBox(box) {
+    clearOverlay();
+    const [x, y, w, h] = box;
+    const scaleX = overlay.width / (hiddenCanvas.width || 640);
+    const scaleY = overlay.height / (hiddenCanvas.height || 480);
+
+    overlayCtx.lineWidth = 3;
+    overlayCtx.strokeStyle = '#3b82f6';
+    overlayCtx.strokeRect(x * scaleX, y * scaleY, w * scaleX, h * scaleY);
+  }
+
+  // Cleanup on leave
+  window.addEventListener('beforeunload', () => {
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(t => t.stop());
+    }
+  });
+
+  // Initial load: start in login mode directly
+  loadUsersList();
+  switchMode('login');
+})();
+</script>
+{% endblock %}
+
