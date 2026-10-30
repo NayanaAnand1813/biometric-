@@ -171,8 +171,10 @@
     let isProcessing = false;
     let isRunning = true;
     let recognizedUser = null;
+    let verifiedMatchCount = 0;
+    const REQUIRED_VERIFIED_MATCHES = 3;
     let unrecognizedConsecutiveCount = 0;
-    const UNRECOGNIZED_LIMIT = 30; // ~6 seconds of continuous scanning before redirecting
+    const UNRECOGNIZED_LIMIT = 25; // ~5 seconds of continuous scanning before redirecting
 
     function setStatus(msg, state = 'scanning') {
       statusBanner.className = `live-status-card ${state}`;
@@ -278,7 +280,7 @@
           const response = await fetch('/api/recognize', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: dataUrl, threshold: 85.0 })
+            body: JSON.stringify({ image: dataUrl, threshold: 48.0 })
           });
 
           if (response.ok) {
@@ -302,6 +304,7 @@
       const hasFace = res.face_detected || (faces.length > 0);
 
       if (!hasFace) {
+        verifiedMatchCount = 0;
         clearOverlay();
         setStatus('Scanning for face... Please look directly into the camera.', 'scanning');
         return;
@@ -314,13 +317,13 @@
         box = primary.box;
         isRecognized = primary.matched && primary.name && primary.name !== 'Unknown';
         userName = primary.name;
-        confScore = primary.accuracy_pct || Math.max(10, Math.min(100, Math.round(100 - (primary.confidence || 50))));
+        confScore = primary.accuracy_pct || 0;
         dist = primary.confidence;
       } else {
         box = res.box;
         isRecognized = res.recognized && res.user && res.user !== 'Unknown';
         userName = res.user;
-        confScore = res.confidence_score || 85;
+        confScore = res.confidence_score || 0;
         dist = res.distance;
       }
 
@@ -333,23 +336,30 @@
       }
 
       if (isRecognized) {
+        verifiedMatchCount++;
         unrecognizedConsecutiveCount = 0;
         unknownWarning.style.display = 'none';
 
         drawFaceBox(bx, by, bw, bh, userName, true, confScore);
-        setStatus(`Identity Verified: Welcome, ${userName}! Access Granted.`, 'success');
 
-        isRunning = false;
-        if (mediaStream) {
-          mediaStream.getTracks().forEach(t => t.stop());
+        if (verifiedMatchCount >= REQUIRED_VERIFIED_MATCHES) {
+          setStatus(`Identity Confirmed: Welcome, ${userName}! Access Granted.`, 'success');
+
+          isRunning = false;
+          if (mediaStream) {
+            mediaStream.getTracks().forEach(t => t.stop());
+          }
+
+          setTimeout(() => {
+            window.location.href = `/welcome?user=${encodeURIComponent(userName)}`;
+          }, 800);
+        } else {
+          setStatus(`Verifying identity (${verifiedMatchCount}/${REQUIRED_VERIFIED_MATCHES})... Hold steady.`, 'scanning');
         }
 
-        setTimeout(() => {
-          window.location.href = `/welcome?user=${encodeURIComponent(userName)}`;
-        }, 1200);
-
       } else {
-        drawFaceBox(bx, by, bw, bh, 'Analyzing Face...', false, 0);
+        verifiedMatchCount = 0;
+        drawFaceBox(bx, by, bw, bh, 'Unregistered Face', false, 0);
         unrecognizedConsecutiveCount++;
 
         if (unrecognizedConsecutiveCount >= UNRECOGNIZED_LIMIT) {

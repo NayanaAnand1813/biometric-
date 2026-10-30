@@ -62,7 +62,7 @@ PROFILES_PATH = MODELS_DIR / "profiles.json"
 
 TARGET_FACE_SIZE = (200, 200)
 MAX_REGISTRATION_IMAGES = 50
-DEFAULT_CONFIDENCE_THRESHOLD = 85.0
+DEFAULT_CONFIDENCE_THRESHOLD = 48.0
 
 
 class FaceService:
@@ -150,10 +150,12 @@ class FaceService:
         return clean
 
     @staticmethod
-    def decode_base64_image(image_data: str) -> np.ndarray:
-        """Decode base64 Data URL or raw base64 string to OpenCV BGR image."""
-        if not image_data:
-            raise ValueError("Empty image data provided.")
+    def decode_base64_image(image_data: Any) -> np.ndarray:
+        """Decode base64 Data URL, raw base64 string, or direct numpy ndarray to OpenCV BGR image."""
+        if isinstance(image_data, np.ndarray):
+            return image_data
+        if not image_data or not isinstance(image_data, str):
+            raise ValueError("Empty or invalid image data provided.")
 
         if "," in image_data:
             image_data = image_data.split(",", 1)[1]
@@ -467,10 +469,13 @@ class FaceService:
                     name = "Unknown"
                     profile = None
 
-                accuracy_pct = max(
-                    0.0,
-                    min(100.0, round(100.0 - (confidence / max(threshold, 1.0)) * 50.0, 1)),
-                )
+                if is_match:
+                    accuracy_pct = max(
+                        50.0,
+                        min(99.9, round(100.0 - (confidence / max(threshold, 1.0)) * 40.0, 1)),
+                    )
+                else:
+                    accuracy_pct = 0.0
 
                 results.append(
                     {

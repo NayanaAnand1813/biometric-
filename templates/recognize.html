@@ -100,21 +100,21 @@
       <div class="form-group" style="background: rgba(11, 18, 33, 0.7); padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border-card);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <label for="thresholdSlider" class="form-label" style="margin: 0;">LBPH Distance Ceiling:</label>
-          <span id="thresholdValueText" class="badge badge-info" style="font-size: 0.95rem;">80.0</span>
+          <span id="thresholdValueText" class="badge badge-info" style="font-size: 0.95rem;">48.0</span>
         </div>
         <input 
           type="range" 
           id="thresholdSlider" 
           class="form-range"
-          min="40" 
-          max="120" 
-          step="5" 
-          value="80" 
+          min="25" 
+          max="80" 
+          step="1" 
+          value="48" 
         >
         <div style="display: flex; justify-content: space-between; font-size: 0.76rem; color: var(--text-dim); margin-top: 6px; font-family: var(--font-mono);">
-          <span>Strict (40)</span>
-          <span>Balanced (80)</span>
-          <span>Tolerant (120)</span>
+          <span>Strict (< 38)</span>
+          <span>Optimal (48)</span>
+          <span>Tolerant (< 60)</span>
         </div>
         <p style="margin-top: 12px; font-size: 0.8rem; color: var(--text-muted); line-height: 1.5;">
           Lower values require higher facial similarity (0 is a mathematical duplicate). If measured histogram distance is below this value, match is confirmed.
