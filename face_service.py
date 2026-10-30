@@ -53,8 +53,28 @@ def safe_rmtree(path_to_remove: Path) -> None:
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent
-FACES_DIR = BASE_DIR / "faces"
-MODELS_DIR = BASE_DIR / "models"
+
+# Support serverless read-only environments (e.g. Vercel / AWS Lambda)
+IS_SERVERLESS = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+if IS_SERVERLESS:
+    DATA_DIR = Path("/tmp")
+    FACES_DIR = DATA_DIR / "faces"
+    MODELS_DIR = DATA_DIR / "models"
+    try:
+        FACES_DIR.mkdir(parents=True, exist_ok=True)
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        src_models = BASE_DIR / "models"
+        if src_models.exists():
+            for src_file in src_models.iterdir():
+                dest_file = MODELS_DIR / src_file.name
+                if not dest_file.exists():
+                    shutil.copy2(src_file, dest_file)
+    except Exception as exc:
+        logger.warning("Could not setup serverless storage in /tmp: %s", exc)
+else:
+    FACES_DIR = BASE_DIR / "faces"
+    MODELS_DIR = BASE_DIR / "models"
+
 CASCADE_PATH = BASE_DIR / "haarcascade_frontalface_default.xml"
 MODEL_PATH = MODELS_DIR / "face_model.yml"
 LABELS_PATH = MODELS_DIR / "labels.json"
@@ -91,8 +111,11 @@ class FaceService:
         self.last_trained_time: Optional[float] = None
 
         # Ensure directories exist
-        FACES_DIR.mkdir(parents=True, exist_ok=True)
-        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            FACES_DIR.mkdir(parents=True, exist_ok=True)
+            MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
 
         self._load_cascade()
         self.load_model()
