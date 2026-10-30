@@ -1,40 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/login",
-      "destination": "/api/index?__path=login"
-    },
-    {
-      "source": "/register",
-      "destination": "/api/index?__path=register"
-    },
-    {
-      "source": "/welcome",
-      "destination": "/api/index?__path=welcome"
-    },
-    {
-      "source": "/dashboard",
-      "destination": "/api/index?__path=dashboard"
-    },
-    {
-      "source": "/recognize",
-      "destination": "/api/index?__path=recognize"
-    },
-    {
-      "source": "/train",
-      "destination": "/api/index?__path=train"
-    },
-    {
-      "source": "/users",
-      "destination": "/api/index?__path=users"
-    },
-    {
-      "source": "/api/:match*",
-      "destination": "/api/index?__path=api/:match*"
-    },
-    {
       "source": "/(.*)",
-      "destination": "/api/index?__path=$1"
+      "destination": "/api/index"
     }
   ]
 }

@@ -258,3 +258,11 @@ def debug_404(e):
         "query_string": request.environ.get("QUERY_STRING"),
         "matched_path": request.environ.get("HTTP_X_MATCHED_PATH"),
     }), 404
+
+
+@app.route("/debug_env")
+def debug_env():
+    return jsonify({
+        "path": request.path,
+        "environ": {k: str(v) for k, v in request.environ.items() if isinstance(v, (str, int, float)) and not k.startswith("werkzeug.") and "KEY" not in k}
+    })
