@@ -244,25 +244,34 @@ def run_app():
     timer.start()
     app.run(host="127.0.0.1", port=port, debug=False)
 
+# -------------------------------------------------------------------------
+# Vercel Serverless Path Fix Middleware
+# -------------------------------------------------------------------------
+from urllib.parse import parse_qs
+
+class VercelPathFixMiddleware:
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        query_string = environ.get("QUERY_STRING", "")
+        if "__path=" in query_string:
+            params = parse_qs(query_string, keep_blank_values=True)
+            raw_path = params.get("__path", [""])[0]
+            if raw_path:
+                environ["PATH_INFO"] = "/" + raw_path.lstrip("/")
+            else:
+                environ["PATH_INFO"] = "/"
+            clean_params = [
+                f"{k}={v}" for k, vals in params.items() if k != "__path" for v in vals
+            ]
+            environ["QUERY_STRING"] = "&".join(clean_params)
+        elif environ.get("PATH_INFO") in ("/api/index", "/api/index/", ""):
+            environ["PATH_INFO"] = "/"
+        return self.wsgi_app(environ, start_response)
+
+app.wsgi_app = VercelPathFixMiddleware(app.wsgi_app)
+
 
 if __name__ == "__main__":
     run_app()
-
-
-@app.errorhandler(404)
-def debug_404(e):
-    return jsonify({
-        "status": 404,
-        "request_path": request.path,
-        "path_info": request.environ.get("PATH_INFO"),
-        "query_string": request.environ.get("QUERY_STRING"),
-        "matched_path": request.environ.get("HTTP_X_MATCHED_PATH"),
-    }), 404
-
-
-@app.route("/debug_env")
-def debug_env():
-    return jsonify({
-        "path": request.path,
-        "environ": {k: str(v) for k, v in request.environ.items() if isinstance(v, (str, int, float)) and not k.startswith("werkzeug.") and "KEY" not in k}
-    })
