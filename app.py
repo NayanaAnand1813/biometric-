@@ -247,3 +247,14 @@ def run_app():
 
 if __name__ == "__main__":
     run_app()
+
+
+@app.errorhandler(404)
+def debug_404(e):
+    return jsonify({
+        "status": 404,
+        "request_path": request.path,
+        "path_info": request.environ.get("PATH_INFO"),
+        "query_string": request.environ.get("QUERY_STRING"),
+        "matched_path": request.environ.get("HTTP_X_MATCHED_PATH"),
+    }), 404
