@@ -229,7 +229,7 @@
     <div id="progressTracker" style="display: none; margin-bottom: 18px;">
       <div class="progress-stats-row">
         <span>ENROLLMENT PROGRESS</span>
-        <strong id="progressText" style="color: #38bdf8;">0 / 50 SAMPLES</strong>
+        <strong id="progressText" style="color: #38bdf8;">Enrolling...</strong>
       </div>
       <div class="progress-container">
         <div id="progressBar" class="progress-bar"></div>
@@ -253,7 +253,7 @@
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
           <circle cx="12" cy="13" r="4"/>
         </svg>
-        <span>Start Face Capture (50 Samples)</span>
+        <span>Start Face Capture</span>
       </button>
 
       <button id="stopCaptureBtn" class="btn btn-danger" style="display: none; flex: 1; padding: 14px; font-size: 1.02rem;">
@@ -278,7 +278,7 @@
         Biometric Profile Enrolled!
       </h2>
       <p style="color: var(--text-muted); font-size: 0.94rem; line-height: 1.5; margin-bottom: 20px;">
-        50 facial geometry samples and profile credentials have been compiled into the LBPH model.
+        Facial geometry patterns and profile credentials have been compiled into the LBPH model.
       </p>
 
       <div class="alert alert-success" style="font-size: 0.88rem; justify-content: center; margin-bottom: 20px;">
@@ -428,9 +428,9 @@
       [regName, regPosition, regEmail].forEach(i => i.disabled = true);
       progressTracker.style.display = 'block';
       progressBar.style.width = '0%';
-      progressText.textContent = `0 / ${TARGET_SAMPLES}`;
+      progressText.textContent = 'Enrolling...';
 
-      setStatus(`Capturing 50 samples for "${name}". Please slowly tilt and rotate head...`, 'info');
+      setStatus(`Capturing biometric profile for "${name}". Please slowly tilt and rotate head...`, 'info');
       captureStep(name, email, position);
     });
 
@@ -445,6 +445,15 @@
 
     async function captureStep(name, email, position) {
       if (!isCapturing || !mediaStream) return;
+
+      const vw = webcam.videoWidth || 640;
+      const vh = webcam.videoHeight || 480;
+      if (hiddenCanvas.width !== vw || hiddenCanvas.height !== vh) {
+        hiddenCanvas.width = vw;
+        hiddenCanvas.height = vh;
+        overlay.width = vw;
+        overlay.height = vh;
+      }
 
       hiddenCtx.drawImage(webcam, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
       const frameData = hiddenCanvas.toDataURL('image/jpeg', 0.85);
@@ -467,10 +476,10 @@
           const count = result.count;
           const pct = Math.min(100, Math.round((count / TARGET_SAMPLES) * 100));
           progressBar.style.width = `${pct}%`;
-          progressText.textContent = `${count} / ${TARGET_SAMPLES}`;
+          progressText.textContent = 'Enrolling...';
 
           if (result.box) drawBox(result.box);
-          setStatus(`Captured sample ${count}/${TARGET_SAMPLES}... Keep moving slightly for diverse angles.`, 'info');
+          setStatus('Analyzing facial features... Keep moving slightly for diverse angles.', 'info');
 
           if (result.completed || count >= TARGET_SAMPLES) {
             isCapturing = false;
@@ -478,7 +487,7 @@
             
             // Auto-compile model to ensure instant recognition on login
             try {
-              setStatus('Compiling biometric model with your 50 samples...', 'info');
+              setStatus('Compiling biometric model with facial features...', 'info');
               await fetch('/api/train', { method: 'POST' });
             } catch (e) {
               console.warn('Post-registration train trigger error:', e);

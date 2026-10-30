@@ -98,6 +98,11 @@
         <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">LBPH Real-Time Face Authentication</p>
       </div>
 
+    <!-- Live Biometric Analysis Progress Bar -->
+    <div id="evalProgressBarContainer" class="progress-container" style="display: none; height: 6px; margin: 12px 0 0; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-subtle);">
+      <div id="evalProgressBar" class="progress-bar" style="width: 0%; height: 100%; transition: width 0.25s ease, background 0.3s ease;"></div>
+    </div>
+
       <div style="display: flex; align-items: center; gap: 8px;">
         <a href="{{ url_for('users') }}" class="btn btn-secondary btn-sm" title="Developer tool: remove or reset registered faces" style="color: #f87171; border-color: rgba(248, 113, 113, 0.3);">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -108,6 +113,16 @@
           <span>Sensor Active</span>
         </span>
       </div>
+
+    <!-- Live Biometric Analysis Progress Bar -->
+    <div id="evalProgressBarContainer" class="progress-container" style="display: none; height: 6px; margin: 12px 0 0; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-subtle);">
+      <div id="evalProgressBar" class="progress-bar" style="width: 0%; height: 100%; transition: width 0.25s ease, background 0.3s ease;"></div>
+    </div>
+    </div>
+
+    <!-- Live Biometric Analysis Progress Bar -->
+    <div id="evalProgressBarContainer" class="progress-container" style="display: none; height: 6px; margin: 12px 0 0; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-subtle);">
+      <div id="evalProgressBar" class="progress-bar" style="width: 0%; height: 100%; transition: width 0.25s ease, background 0.3s ease;"></div>
     </div>
 
     <!-- Futuristic Cyber Camera HUD Stage -->
@@ -123,15 +138,30 @@
             <circle cx="12" cy="13" r="4"/>
           </svg>
         </div>
+
+    <!-- Live Biometric Analysis Progress Bar -->
+    <div id="evalProgressBarContainer" class="progress-container" style="display: none; height: 6px; margin: 12px 0 0; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-subtle);">
+      <div id="evalProgressBar" class="progress-bar" style="width: 0%; height: 100%; transition: width 0.25s ease, background 0.3s ease;"></div>
+    </div>
         <p style="font-weight: 600; color: #ffffff;">Initializing Optical Biometric Sensor...</p>
         <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 4px;">
           Please grant camera permission in your browser prompt.
         </p>
       </div>
 
+    <!-- Live Biometric Analysis Progress Bar -->
+    <div id="evalProgressBarContainer" class="progress-container" style="display: none; height: 6px; margin: 12px 0 0; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-subtle);">
+      <div id="evalProgressBar" class="progress-bar" style="width: 0%; height: 100%; transition: width 0.25s ease, background 0.3s ease;"></div>
+    </div>
+
       <video id="webcam" class="camera-video" autoplay playsinline muted style="display: none;"></video>
       <canvas id="overlay" class="overlay-canvas"></canvas>
       <canvas id="hiddenCanvas" style="display: none;"></canvas>
+    </div>
+
+    <!-- Live Biometric Analysis Progress Bar -->
+    <div id="evalProgressBarContainer" class="progress-container" style="display: none; height: 6px; margin: 12px 0 0; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-subtle);">
+      <div id="evalProgressBar" class="progress-bar" style="width: 0%; height: 100%; transition: width 0.25s ease, background 0.3s ease;"></div>
     </div>
 
     <!-- Real-time HUD Status Indicator -->
@@ -140,14 +170,37 @@
       <span id="statusMessage">Scanning for face... Please look directly into the camera.</span>
     </div>
 
-    <!-- Countdown Warning for Unregistered Identity -->
-    <div id="unknownWarning" class="alert alert-warning" style="display: none; margin-top: 16px; margin-bottom: 0; justify-content: center; font-size: 0.88rem;">
+    <!-- Live Biometric Analysis Progress Bar -->
+    <div id="evalProgressBarContainer" class="progress-container" style="display: none; height: 6px; margin: 12px 0 0; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-subtle);">
+      <div id="evalProgressBar" class="progress-bar" style="width: 0%; height: 100%; transition: width 0.25s ease, background 0.3s ease;"></div>
+    </div>
+
+    <!-- Live Biometric Analysis Loading Bar -->
+    <div id="evalProgressBarContainer" class="progress-container" style="display: none; height: 6px; margin: 14px 0 0; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-subtle);">
+      <div id="evalProgressBar" class="progress-bar" style="width: 0%; height: 100%; transition: width 0.25s ease, background 0.3s ease;"></div>
+    </div>
+
+    <!-- Warning for Unregistered Identity -->
+    <div id="unknownWarning" class="alert alert-warning" style="display: none; margin-top: 16px; margin-bottom: 0; justify-content: space-between; align-items: center; font-size: 0.88rem;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
         <line x1="12" y1="9" x2="12" y2="13"/>
         <line x1="12" y1="17" x2="12.01" y2="17"/>
       </svg>
-      <span>Face not recognized. Redirecting to registration in <strong id="countdownText">3</strong> seconds...</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span>Face not recognized. <strong>Please register before login.</strong> Redirecting...</span>
+      </div>
+
+    <!-- Live Biometric Analysis Progress Bar -->
+    <div id="evalProgressBarContainer" class="progress-container" style="display: none; height: 6px; margin: 12px 0 0; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-subtle);">
+      <div id="evalProgressBar" class="progress-bar" style="width: 0%; height: 100%; transition: width 0.25s ease, background 0.3s ease;"></div>
+    </div>
+      <a href="/?msg=unregistered" class="btn btn-primary btn-sm" style="padding: 4px 12px; font-size: 0.8rem; text-decoration: none; white-space: nowrap;">Return to Portal</a>
+    </div>
+
+    <!-- Live Biometric Analysis Progress Bar -->
+    <div id="evalProgressBarContainer" class="progress-container" style="display: none; height: 6px; margin: 12px 0 0; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-subtle);">
+      <div id="evalProgressBar" class="progress-bar" style="width: 0%; height: 100%; transition: width 0.25s ease, background 0.3s ease;"></div>
     </div>
   </div>
 
@@ -163,6 +216,8 @@
     const statusMessage = document.getElementById('statusMessage');
     const unknownWarning = document.getElementById('unknownWarning');
     const countdownText = document.getElementById('countdownText');
+    const evalProgressBarContainer = document.getElementById('evalProgressBarContainer');
+    const evalProgressBar = document.getElementById('evalProgressBar');
 
     const overlayCtx = overlay.getContext('2d');
     const hiddenCtx = hiddenCanvas.getContext('2d');
@@ -258,6 +313,11 @@
           <div class="camera-placeholder-icon" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);">
             <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
           </div>
+
+    <!-- Live Biometric Analysis Progress Bar -->
+    <div id="evalProgressBarContainer" class="progress-container" style="display: none; height: 6px; margin: 12px 0 0; background: rgba(255, 255, 255, 0.08); border-radius: 999px; overflow: hidden; border: 1px solid var(--border-subtle);">
+      <div id="evalProgressBar" class="progress-bar" style="width: 0%; height: 100%; transition: width 0.25s ease, background 0.3s ease;"></div>
+    </div>
           <p style="color: #f87171; font-weight: 700;">Camera Access Denied or Unavailable</p>
           <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; max-width: 380px;">
             Please ensure a camera is attached and enable browser camera permissions to authenticate.
@@ -306,6 +366,10 @@
       if (!hasFace) {
         verifiedMatchCount = 0;
         clearOverlay();
+        if (evalProgressBarContainer) {
+          evalProgressBarContainer.style.display = 'none';
+          evalProgressBar.style.width = '0%';
+        }
         setStatus('Scanning for face... Please look directly into the camera.', 'scanning');
         return;
       }
@@ -342,6 +406,13 @@
 
         drawFaceBox(bx, by, bw, bh, userName, true, confScore);
 
+        if (evalProgressBarContainer) {
+          evalProgressBarContainer.style.display = 'block';
+          const matchPct = Math.min(100, Math.round((verifiedMatchCount / REQUIRED_VERIFIED_MATCHES) * 100));
+          evalProgressBar.style.width = `${matchPct}%`;
+          evalProgressBar.style.background = 'linear-gradient(90deg, #0284c7 0%, #10b981 100%)';
+        }
+
         if (verifiedMatchCount >= REQUIRED_VERIFIED_MATCHES) {
           setStatus(`Identity Confirmed: Welcome, ${userName}! Access Granted.`, 'success');
 
@@ -354,7 +425,7 @@
             window.location.href = `/welcome?user=${encodeURIComponent(userName)}`;
           }, 800);
         } else {
-          setStatus(`Verifying identity (${verifiedMatchCount}/${REQUIRED_VERIFIED_MATCHES})... Hold steady.`, 'scanning');
+          setStatus('Verifying biometric identity... Hold steady.', 'scanning');
         }
 
       } else {
@@ -362,27 +433,28 @@
         drawFaceBox(bx, by, bw, bh, 'Unregistered Face', false, 0);
         unrecognizedConsecutiveCount++;
 
+        if (evalProgressBarContainer) {
+          evalProgressBarContainer.style.display = 'block';
+          const scanPct = Math.min(100, Math.round((unrecognizedConsecutiveCount / UNRECOGNIZED_LIMIT) * 100));
+          evalProgressBar.style.width = `${scanPct}%`;
+          evalProgressBar.style.background = 'linear-gradient(90deg, #f59e0b, #ef4444)';
+        }
+
         if (unrecognizedConsecutiveCount >= UNRECOGNIZED_LIMIT) {
           isRunning = false;
           if (mediaStream) {
             mediaStream.getTracks().forEach(t => t.stop());
           }
 
+          if (evalProgressBar) evalProgressBar.style.width = '100%';
           unknownWarning.style.display = 'flex';
-          let countdown = 4;
-          countdownText.textContent = countdown;
-          setStatus('Facial identity not enrolled in database.', 'warning');
+          setStatus('Face not recognized. Please register before login.', 'danger');
 
-          const timer = setInterval(() => {
-            countdown--;
-            countdownText.textContent = countdown;
-            if (countdown <= 0) {
-              clearInterval(timer);
-              window.location.href = '/?msg=unregistered';
-            }
-          }, 1000);
+          setTimeout(() => {
+            window.location.href = '/?msg=unregistered';
+          }, 2000);
         } else {
-          setStatus(`Analyzing facial geometry... (Scanning ${unrecognizedConsecutiveCount}/${UNRECOGNIZED_LIMIT})`, 'scanning');
+          setStatus('Analyzing facial biometric patterns... Hold steady.', 'warning');
         }
       }
     }
