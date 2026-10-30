@@ -27,15 +27,15 @@ class VercelPathFixMiddleware:
                 raw_path = params["__path"][0]
                 target_path = "/" + raw_path.lstrip("/")
                 environ["PATH_INFO"] = target_path
-                # Clean __path from QUERY_STRING so it doesn't pollute request.args
                 clean_qs = "&".join(
                     f"{k}={v}" for k, vals in params.items() if k != "__path" for v in vals
                 )
                 environ["QUERY_STRING"] = clean_qs
             else:
                 environ["PATH_INFO"] = "/"
-        elif environ.get("PATH_INFO") in ("/api/index", "/api/index/"):
+        elif environ.get("PATH_INFO") in ("/api/index", "/api/index/", ""):
             environ["PATH_INFO"] = "/"
+
         return self.wsgi_app(environ, start_response)
 
 app.wsgi_app = VercelPathFixMiddleware(app.wsgi_app)

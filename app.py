@@ -44,7 +44,6 @@ face_service = FaceService()
 
 @app.route("/", endpoint="landing_page")
 @app.route("/home", endpoint="index")
-@app.route("/api/index", endpoint="api_index")
 def landing_page():
     """Landing Portal: ONLY Login and Register options with notification banners."""
     msg = request.args.get("msg", "")
