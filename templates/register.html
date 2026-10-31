@@ -501,8 +501,9 @@
             return;
           }
         } else {
-          if (result.error && result.error.includes('No face detected')) {
-            setStatus('No face detected. Please face the sensor in clear illumination.', 'warning');
+          clearOverlay();
+          if (result.error) {
+            setStatus(result.error, 'warning');
           }
         }
       } catch (err) {

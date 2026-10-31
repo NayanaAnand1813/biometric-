@@ -370,7 +370,11 @@
           evalProgressBarContainer.style.display = 'none';
           evalProgressBar.style.width = '0%';
         }
-        setStatus('Scanning for face... Please look directly into the camera.', 'scanning');
+        if (res.filter_rejected && res.filter_reason) {
+          setStatus(res.filter_reason, 'warning');
+        } else {
+          setStatus('Scanning for face... Please look directly into the camera.', 'scanning');
+        }
         return;
       }
 

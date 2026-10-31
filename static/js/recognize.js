@@ -236,7 +236,11 @@
             }
           } else {
             diagScore.textContent = '--';
-            updateStatusCard('Scanning for faces...', 'No face currently detected in frame', 'scanning', 'warning', 'No Face');
+            if (result.filter_rejected && result.filter_reason) {
+              updateStatusCard('Non-Human Object Filtered', result.filter_reason, 'warning', 'warning', 'Filtered');
+            } else {
+              updateStatusCard('Scanning for faces...', 'No face currently detected in frame', 'scanning', 'warning', 'No Face');
+            }
           }
         } else if (result.model_loaded === false) {
           unloadedModelAlert.style.display = 'flex';

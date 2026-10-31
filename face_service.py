@@ -76,6 +76,7 @@ else:
     MODELS_DIR = BASE_DIR / "models"
 
 CASCADE_PATH = BASE_DIR / "haarcascade_frontalface_default.xml"
+EYE_CASCADE_PATH = BASE_DIR / "haarcascade_eye.xml"
 MODEL_PATH = MODELS_DIR / "face_model.yml"
 LABELS_PATH = MODELS_DIR / "labels.json"
 PROFILES_PATH = MODELS_DIR / "profiles.json"
@@ -105,6 +106,7 @@ class FaceService:
 
         self._initialized = True
         self.face_cascade: Optional[cv2.CascadeClassifier] = None
+        self.eye_cascade: Optional[cv2.CascadeClassifier] = None
         self.recognizer: Optional[cv2.face.LBPHFaceRecognizer] = None
         self.labels: Dict[int, str] = {}
         self.model_needs_retrain: bool = False
@@ -121,7 +123,7 @@ class FaceService:
         self.load_model()
 
     def _load_cascade(self) -> None:
-        """Load Haar Cascade classifier."""
+        """Load Haar Cascade classifiers for face and eyes."""
         if not CASCADE_PATH.exists():
             raise FileNotFoundError(
                 f"Cascade file not found at: {CASCADE_PATH}. "
@@ -131,6 +133,11 @@ class FaceService:
         self.face_cascade = cv2.CascadeClassifier(str(CASCADE_PATH))
         if self.face_cascade.empty():
             raise RuntimeError(f"Failed to load cascade classifier from {CASCADE_PATH}")
+
+        if EYE_CASCADE_PATH.exists():
+            eye_clf = cv2.CascadeClassifier(str(EYE_CASCADE_PATH))
+            if not eye_clf.empty():
+                self.eye_cascade = eye_clf
 
     def load_model(self) -> bool:
         """Load LBPH model and label mapping into memory."""
@@ -201,18 +208,109 @@ class FaceService:
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         return clahe.apply(denoised)
 
-    def detect_faces(self, gray_image: np.ndarray) -> List[Tuple[int, int, int, int]]:
+    def detect_faces(
+        self,
+        gray_image: np.ndarray,
+        min_neighbors: int = 5,
+        min_size: Tuple[int, int] = (60, 60),
+        scale_factor: float = 1.1,
+    ) -> List[Tuple[int, int, int, int]]:
         """Detect faces in a grayscale image using Haar Cascade."""
         if self.face_cascade is None:
             raise RuntimeError("Cascade classifier is not initialized.")
 
         faces = self.face_cascade.detectMultiScale(
             gray_image,
-            scaleFactor=1.1,
-            minNeighbors=4,
-            minSize=(30, 30),
+            scaleFactor=scale_factor,
+            minNeighbors=min_neighbors,
+            minSize=min_size,
         )
         return [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in faces]
+
+    def validate_human_face(
+        self,
+        bgr_image: np.ndarray,
+        box: Tuple[int, int, int, int],
+        strict: bool = True,
+    ) -> Tuple[bool, str]:
+        """Multi-stage human face verification filter algorithm.
+
+        Rejects non-human objects, plain sheets of paper, flat walls, drawings,
+        and low-texture false positives using geometric, texture entropy,
+        chrominance skin-tone, edge density, and facial landmark criteria.
+        """
+        x, y, w, h = box
+        img_h, img_w = bgr_image.shape[:2]
+
+        # 1. Bounds and geometric validation
+        if x < 0 or y < 0 or (x + w) > img_w or (y + h) > img_h:
+            return False, "Candidate region extends outside frame boundaries."
+
+        min_dim = 65 if strict else 48
+        if w < min_dim or h < min_dim:
+            return False, f"Face region too small ({w}x{h}px, minimum {min_dim}px required)."
+
+        aspect_ratio = float(w) / float(h)
+        if not (0.65 <= aspect_ratio <= 1.35):
+            return False, f"Invalid facial aspect ratio ({aspect_ratio:.2f})."
+
+        roi_bgr = bgr_image[y : y + h, x : x + w]
+        roi_gray = cv2.cvtColor(roi_bgr, cv2.COLOR_BGR2GRAY)
+
+        # 2. Texture standard deviation filter (Anti-Plain-Sheet / Anti-Flat-Surface)
+        std_dev = float(np.std(roi_gray))
+        min_std = 16.0 if strict else 14.0
+        if std_dev < min_std:
+            return False, "Flat or plain surface detected. Please present a real human face."
+
+        # 3. Edge contour density filter (Anti-Blank-Surface)
+        edges = cv2.Canny(roi_gray, 50, 150)
+        edge_density = float(np.count_nonzero(edges)) / float(w * h)
+        min_edge = 0.012 if strict else 0.008
+        if edge_density < min_edge:
+            return False, "Insufficient facial contours detected. Ensure face is clearly visible."
+
+        # 4. Human Skin Chrominance Filter (YCbCr + HSV)
+        # Sample the central 65% of the ROI to focus on cheeks, nose, and forehead
+        margin_x = int(w * 0.175)
+        margin_y = int(h * 0.175)
+        center_bgr = roi_bgr[margin_y : h - margin_y, margin_x : w - margin_x]
+        total_center_pixels = max(1, center_bgr.shape[0] * center_bgr.shape[1])
+
+        # YCrCb color space
+        ycrcb = cv2.cvtColor(center_bgr, cv2.COLOR_BGR2YCrCb)
+        cr = ycrcb[:, :, 1]
+        cb = ycrcb[:, :, 2]
+        skin_ycrcb = (cr >= 130) & (cr <= 175) & (cb >= 75) & (cb <= 130)
+        ratio_ycrcb = float(np.count_nonzero(skin_ycrcb)) / float(total_center_pixels)
+
+        # HSV color space
+        hsv = cv2.cvtColor(center_bgr, cv2.COLOR_BGR2HSV)
+        h_ch, s_ch, v_ch = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
+        skin_hsv = ((h_ch <= 25) | (h_ch >= 165)) & (s_ch >= 25) & (s_ch <= 215) & (v_ch >= 40)
+        ratio_hsv = float(np.count_nonzero(skin_hsv)) / float(total_center_pixels)
+
+        skin_ratio = max(ratio_ycrcb, ratio_hsv)
+        min_skin = 0.16 if strict else 0.12
+        if skin_ratio < min_skin:
+            return False, "Non-human object detected. Please present a real human face."
+
+        # 5. Eye / Facial Feature Verification
+        if self.eye_cascade is not None and not self.eye_cascade.empty():
+            eye_band = roi_gray[0 : int(h * 0.60), :]
+            eyes = self.eye_cascade.detectMultiScale(
+                eye_band,
+                scaleFactor=1.1,
+                minNeighbors=3,
+                minSize=(14, 14),
+            )
+            has_eyes = len(eyes) > 0
+            if strict and not has_eyes:
+                # If eyes not directly located (e.g. blinking or glasses), require stronger skin & texture confirmation
+                if skin_ratio < 0.22 or std_dev < 18.0:
+                    return False, "Facial eye features not detected. Please look directly into the camera."
+
+        return True, "Valid human face."
 
     # -------------------------------------------------------------------------
     # Profile Metadata Management
@@ -295,17 +393,14 @@ class FaceService:
             }
 
         user_dir = FACES_DIR / clean_name
-        user_dir.mkdir(parents=True, exist_ok=True)
-
-        existing_images = [
-            f for f in user_dir.iterdir()
-            if f.is_file() and f.suffix.lower() in (".jpg", ".jpeg", ".png")
-        ]
+        if user_dir.exists():
+            existing_images = [
+                f for f in user_dir.iterdir()
+                if f.is_file() and f.suffix.lower() in (".jpg", ".jpeg", ".png")
+            ]
+        else:
+            existing_images = []
         current_count = len(existing_images)
-
-        # Save profile metadata on first frame or if fields provided
-        if email or position or current_count == 0:
-            self.save_user_profile(clean_name, email, position)
 
         if current_count >= MAX_REGISTRATION_IMAGES:
             return {
@@ -326,9 +421,9 @@ class FaceService:
             }
 
         gray = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
-        detected_faces = self.detect_faces(gray)
+        candidate_faces = self.detect_faces(gray, min_neighbors=6, min_size=(65, 65))
 
-        if not detected_faces:
+        if not candidate_faces:
             return {
                 "success": False,
                 "error": "No face detected. Please ensure your face is well-lit and centered in the camera.",
@@ -336,8 +431,32 @@ class FaceService:
                 "max_count": MAX_REGISTRATION_IMAGES,
             }
 
-        detected_faces.sort(key=lambda b: b[2] * b[3], reverse=True)
-        x, y, w, h = detected_faces[0]
+        # Multi-stage human face filter verification (Anti-Plain-Sheet & Anti-Non-Human)
+        valid_faces = []
+        filter_reasons = []
+        for box in candidate_faces:
+            is_valid, reason = self.validate_human_face(bgr_image, box, strict=True)
+            if is_valid:
+                valid_faces.append(box)
+            else:
+                filter_reasons.append(reason)
+
+        if not valid_faces:
+            error_message = filter_reasons[0] if filter_reasons else "Non-human object detected. Please present a real face."
+            return {
+                "success": False,
+                "error": error_message,
+                "filter_rejected": True,
+                "count": current_count,
+                "max_count": MAX_REGISTRATION_IMAGES,
+            }
+
+        valid_faces.sort(key=lambda b: b[2] * b[3], reverse=True)
+        x, y, w, h = valid_faces[0]
+
+        user_dir.mkdir(parents=True, exist_ok=True)
+        if email or position or current_count == 0:
+            self.save_user_profile(clean_name, email, position)
 
         face_roi = gray[y : y + h, x : x + w]
         face_normalized = self.preprocess_face(face_roi)
@@ -468,11 +587,20 @@ class FaceService:
             }
 
         gray = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
-        detected_boxes = self.detect_faces(gray)
+        candidate_boxes = self.detect_faces(gray, min_neighbors=5, min_size=(50, 50))
 
         # Fallback if image is tightly-cropped
-        if not detected_boxes and gray.shape[0] <= 240 and gray.shape[1] <= 240:
-            detected_boxes = [(0, 0, gray.shape[1], gray.shape[0])]
+        if not candidate_boxes and gray.shape[0] <= 240 and gray.shape[1] <= 240:
+            candidate_boxes = [(0, 0, gray.shape[1], gray.shape[0])]
+
+        detected_boxes: List[Tuple[int, int, int, int]] = []
+        filter_reason = ""
+        for box in candidate_boxes:
+            is_valid, reason = self.validate_human_face(bgr_image, box, strict=False)
+            if is_valid:
+                detected_boxes.append(box)
+            elif not filter_reason:
+                filter_reason = reason
 
         results: List[Dict[str, Any]] = []
 
@@ -520,6 +648,8 @@ class FaceService:
             "model_loaded": True,
             "face_count": len(results),
             "faces": results,
+            "filter_rejected": bool(filter_reason and not detected_boxes),
+            "filter_reason": filter_reason,
         }
 
     def get_registered_users(self) -> List[Dict[str, Any]]:
